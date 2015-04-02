@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 #
-# fastqdumps2histo.py v1.1 last modified 2015-03-25
+# fastqdumps2histo.py v1.1 last modified 2015-04-02
 # by WRF
 
 """
-fastqdumps2histo.py v1.1 2015-03-25
+fastqdumps2histo.py v1.1 2015-04-02
 
     first generate fastq.counts file from zipped reads with jellyfish count
 gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1000000000 /dev/fd/0
@@ -61,7 +61,7 @@ def main(argv, wayout):
 	args = parser.parse_args(argv)
 
 	# generate kmer x maximum matrix
-	m = [[0 for x in range(args.maximum+1)] for y in range(args.kmer+1)]
+	m = [[0 for x in range(args.upper+1)] for y in range(args.kmer+1)]
 	kmercount = 0
 
 	print >> sys.stderr, "Reading fastq dumps", time.asctime()
