@@ -1,5 +1,5 @@
 # plot jellyfish kmer coverage vs gc content in lava lamp form
-# v2 last modified 2015-03-26
+# v2 last modified 2015-04-02
 
 # generate csv matrix of outputs using fastqdumps2histo.py
 
