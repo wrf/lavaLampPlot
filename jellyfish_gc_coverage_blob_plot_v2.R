@@ -1,7 +1,11 @@
 # plot jellyfish kmer coverage vs gc content in lava lamp form
 # v2 last modified 2015-04-02
 
+# this script was generated using R version 3.1.3
 # generate csv matrix of outputs using fastqdumps2histo.py
+
+# run in the command line with:
+# $ Rscript jellyfish_gc_coverage_blob_plot_v2.R
 
 ### CHANGE THIS FILE TO THE CSV FROM THE PREVIOUS STEP
 f1 = "~/genomes/hydra_vulgaris/hydra_vulgaris_SRR1032106.k31.gc_vs_cov.csv"
@@ -54,7 +58,7 @@ colorset = c(colorRampPalette(c("#FFFFFF","#FF00FF"),alpha=0.9)(white2pink), rai
 
 # for coverage heatmap
 ### MUST UNCOMMENT FOR PDF OUTPUT
-#pdf(file=outfilename, width=10, heigh=8)
+pdf(file=outfilename, width=10, heigh=8)
 
 par(mar=c(4,4,4,4))
 # this becomes the main chart label
@@ -75,4 +79,5 @@ yscale = ceiling(log(ymax2,base=10))
 plot(d2, type='l', xlab="Coverage", ylab="Unique kmers", xlim=c(0,xmax2), ylim=c(10^2,10^yscale), log='y', frame.plot=FALSE, axes=FALSE)
 
 ### MUST UNCOMMENT FOR PDF OUTPUT
-#dev.off()
+dev.off()
+print("PDF created!")
