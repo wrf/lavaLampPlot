@@ -3,14 +3,20 @@
 
 # generate csv matrix of outputs using fastqdumps2histo.py
 
-### CHANGE THIS FILE TO THE CSV OUTPUT
+### CHANGE THIS FILE TO THE CSV FROM THE PREVIOUS STEP
 f1 = "~/genomes/hydra_vulgaris/hydra_vulgaris_SRR1032106.k31.gc_vs_cov.csv"
 
+### RENAME THIS TO THE DESIRED OUTPUT PDF
+# change this for the output pdf, note that the pdf extension may be required
+outfilename = "~/genomes/hydra_vulgaris/hydra_vulgaris_k31_vs_gc_with_line.pdf"
+
 ### CHANGE THIS VALUE BASED ON JELLYFISH -U OPTION
-# to subset or make the matrix smaller, change ymax
+# or to subset or make the matrix smaller, change ymax, say to view from 0 to 500
 ymax = 1000
+# change zmax to correct color resolution, in case the real max is lower than zmax
 zmax = 1000000
 
+### THIS BLOCK BELOW SHOULD REMAIN MOSTLY UNCHANGED
 # read in data and create log of matrix for color coding
 # ymax here is also used to adjust the heatmap size
 d1 = read.table(f1, header=FALSE, sep=",", colClasses='integer')[,1:ymax]
@@ -33,18 +39,22 @@ gclabels = round(gcpositions / kmer * 100)
 # must calculate sums before normalizing
 d2 = colSums(m1)
 
-# chops all values greater than 1M to 1M
+# chops all values greater than zmax to zmax, which is 1 million by default
 m1[m1>zmax] = zmax
 # log all values to get better color resolution
 m2 = log(m1, base=2)
 
 # use this for log base 2
-# first function generates color scale from white to purple, then purple to red
-colorset = c(colorRampPalette(c("#FFFFFF","#FF00FF"),alpha=0.9)(100), rainbow(900, s=0.95, e=0.93, v=0.75, alpha=0.9) )
+# first function generates color scale of 1000 colors from white to purple, then purple to red
+colorcount = 1000
+# 10 percent of the colors are for white to pink, the rest through the rainbow
+white2pink = colorcount*0.1
+pink2red = colorcount*0.9
+colorset = c(colorRampPalette(c("#FFFFFF","#FF00FF"),alpha=0.9)(white2pink), rainbow(pink2red, s=0.95, e=0.93, v=0.75, alpha=0.9) )
 
 # for coverage heatmap
-### UNCOMMENT AND RENAME FOR PDF OUTPUT
-#pdf(file="~/genomes/hydra_vulgaris/hydra_vulgaris_k31_vs_gc_with_line.pdf", width=10, heigh=8)
+### MUST UNCOMMENT FOR PDF OUTPUT
+#pdf(file=outfilename, width=10, heigh=8)
 
 par(mar=c(4,4,4,4))
 # this becomes the main chart label
@@ -55,10 +65,10 @@ axis(1, at=pretty(c(0,ymax)), labels=pretty(c(0,ymax)) )
 # because 0 is a position, all other positions have to be corrected
 axis(2, at=gcpositions+1, labels=gclabels )
 
-### GENERATE LINE OVERLAY
-### COMMENT OUT PAR THROUGH PLOT TO REMOVE THIS
+# GENERATE LINE OVERLAY
+### COMMENT OUT LINES FROM PAR THROUGH PLOT TO REMOVE LINE OVERLAY
 par(new=TRUE, mar=c(4,2,2,2))
-# params for line generation
+# parameters for line generation
 xmax2 = length(d2)
 ymax2 = max(d2)
 yscale = ceiling(log(ymax2,base=10))
