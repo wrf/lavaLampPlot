@@ -69,6 +69,14 @@ axis(1, at=pretty(c(0,ymax)), labels=pretty(c(0,ymax)) )
 # because 0 is a position, all other positions have to be corrected
 axis(2, at=gcpositions+1, labels=gclabels )
 
+# for text overlay
+textcol="white"
+textsize = 1.3
+# x axis positions center at the given value, so must be increased for left alignment
+# y axis positions correspond to GC counts, not percentage
+text(160,9,"Hydra genomic", col=textcol, cex=textsize)
+text(125,24,"Curvibacter", col=textcol, cex=textsize)
+
 # GENERATE LINE OVERLAY
 ### COMMENT OUT LINES FROM PAR THROUGH PLOT TO REMOVE LINE OVERLAY
 par(new=TRUE, mar=c(4,2,2,2))
