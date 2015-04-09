@@ -72,12 +72,14 @@ axis(2, at=gcpositions+1, labels=gclabels )
 # for text overlay
 textcol="white"
 textsize = 1.3
+# add one text command for each comment, such as identity of each blob
 # x axis positions center at the given value, so must be increased for left alignment
 # y axis positions correspond to GC counts, not percentage
-text(160,9,"Hydra genomic", col=textcol, cex=textsize)
-text(125,24,"Curvibacter", col=textcol, cex=textsize)
+### UNCOMMENT TO DISPLAY TEXT OVERLAY OR MODIFY
+#text(160,9,"Hydra genomic", col=textcol, cex=textsize)
+#text(125,24,"Curvibacter", col=textcol, cex=textsize)
 
-# GENERATE LINE OVERLAY
+# for line overlay
 ### COMMENT OUT LINES FROM PAR THROUGH PLOT TO REMOVE LINE OVERLAY
 par(new=TRUE, mar=c(4,2,2,2))
 # parameters for line generation
