@@ -1,13 +1,13 @@
 #! /usr/bin/env python
 #
-# fastqdumps2histo.py v1.1 last modified 2015-04-02
+# fastqdumps2histo.py v1.1 last modified 2015-04-09
 # by WRF
 
 """
-fastqdumps2histo.py v1.1 2015-04-02
+fastqdumps2histo.py v1.1 2015-04-09
 
     first generate fastq.counts file from zipped reads with jellyfish count
-gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1000000000 /dev/fd/0
+gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G /dev/fd/0
 
   add option -t for multithreads
   change -m for different kmer sizes
@@ -28,6 +28,7 @@ fastqdumps2histo.py fastq.dumps > histo.csv
     if using a different kmer (other than 25, the default)
     change with -k to correspond to the -m of jellyfish
     also change -u to correspond to the -U of jellyfish
+    change -u accordingly if multiple jellyfish counts are merged
 
     histo.csv is a comma separated matrix by GC count and coverage
     coverage is taken from the fasta header for the kmer, which appears as:
@@ -63,6 +64,7 @@ def main(argv, wayout):
 	# generate kmer x maximum matrix
 	m = [[0 for x in range(args.upper+1)] for y in range(args.kmer+1)]
 	kmercount = 0
+	maxcount = 0
 
 	print >> sys.stderr, "Reading fastq dumps", time.asctime()
 	for line in args.input_file:
@@ -76,13 +78,20 @@ def main(argv, wayout):
 			seq = line.rstrip()
 			# calculate gc content for output
 			gc = get_gc(seq)
-			m[gc][freq] += 1
+			# use try except in case the wrong -u is used or files were merged
+			try:
+				m[gc][freq] += 1
+			except IndexError:
+				# any values outside of the range of the matrix are thus ignored
+				maxcount += 1
 
 	print >> sys.stderr, "Writing counts", time.asctime()
 	for i in m:
 		print >> wayout, args.separator.join([str(j) for j in i])
 
 	print >> sys.stderr, "Counted %d kmers" % (kmercount), time.asctime()
+	if maxcount:
+		print >> sys.stderr, "%d kmers exceeded cutoffs" % (maxcount), time.asctime()
 
 if __name__ == "__main__":
 	main(sys.argv[1:],sys.stdout)
