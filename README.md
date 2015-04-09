@@ -39,7 +39,7 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
 Due to the connection between kmer length and coverage, there is necessarily a balance between longer kmers, which will resolve the y-axis better, and higher coverage, which will resolve the x-axis better. Kmers between 31 and 41 tend to perform fairly well.
 
 #### Sequencing depth
-Sequencing coverage is also important. Environmental metagenomes (not amplicon sequencing) of fairly low coverage (5 gigbases) did not display any useful complexity. For metazoan genomes of 100-200Mb, around 20-30Gb of sequence data usually produced high quality plots displaying blobs for both animal and potential bacterial symbionts (see the example plot of Hydra, using one SRA of 25Gb of raw sequence).
+Sequencing coverage is also important. Environmental metagenomes (not amplicon sequencing) of fairly low coverage (5 gigbases) did not display any useful complexity. For metazoan genomes of 100-200Mb, around 20-30Gb of sequence data usually produced high quality plots displaying blobs for both animal and potential bacterial symbionts (see the example plot of *Hydra*, using one SRA of 25Gb of raw sequence).
 
 #### Memory usage
 Jellyfish can easily max out the memory on a system. The hash buffer (`-s`) will expand if jellyfish counts more kmers than the number initially provided. Some systems have safeguards to kill any process demanding 99% of the memory, but otherwise this may crash a computer. In those cases, it is advisable to split the dataset or just run `jellyfish count` on a faction of the reads, such as the left or right reads alone. In both cases, the counts are then combined using the `jellyfish merge` command:
@@ -50,7 +50,9 @@ followed by running `jellyfish dump` and the python script as above:
 
 `jellyfish dump combined.counts | fastqdumps2histo.py -k 31 -u 2000 - > combined.gc_cov.histo.csv`
 
-Note that when using merge, the `-u` option for fastqdumps2histo must be changed accordingly, probably multiplied for each file that is merged. If this was two files with `-U 1000`, then set the value to 2000 rather than 1000.
+Note that when using merge, the `-u` option for fastqdumps2histo must be changed accordingly, probably multiplied for each file that is merged. If this was two files with `-U 1000`, then set the value to 2000 rather than 1000. Also, the hash size (`-s`) must be the same for all files in the merge, so pick something large enough, maybe 3G (3 billion) if you have the memory.
+
+The merging generates counts that are slightly different from counting them as a single set, on the order of 0.001% *more* when separate sets were merged than when counted as a single set. This is after excluding those above the counts cutoff for the single set (which might account for 0.01%). I have no explanation for this.
 
 The manual from jellyfish v1 implies that if the output file is not specified with `-o`, jellyfish should create an extra output file with the default name ("output_") when the hash size is full. I have not tested if this works for sparing memory usage.
 
