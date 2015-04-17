@@ -42,7 +42,7 @@ Due to the connection between kmer length and coverage, there is necessarily a b
 Sequencing coverage is also important. Environmental metagenomes (not amplicon sequencing) of fairly low coverage (5 gigbases) did not display any useful complexity. For metazoan genomes of 100-200Mb, around 20-30Gb of sequence data usually produced high quality plots displaying blobs for both animal and potential bacterial symbionts (see the example plot of *Hydra*, using one SRA of 25Gb of raw sequence).
 
 #### Memory usage
-Jellyfish can easily max out the memory on a system. The hash buffer (`-s`) will expand if jellyfish counts more kmers than the number initially provided. Some systems have safeguards to kill any process demanding 99% of the memory, but otherwise this may crash a computer. In those cases, it is advisable to split the dataset or just run `jellyfish count` on a faction of the reads, such as the left or right reads alone. In both cases, the counts are then combined using the `jellyfish merge` command:
+Jellyfish can easily max out the memory on a system. For a hash size of 1G (1 billion kmers), for a k-mer of 31, it takes 6Gb of memory on my system; 2G takes 12Gb and 3-4G takes 23Gb (probably scales binarily). The hash buffer (`-s`) will expand if jellyfish counts more kmers than the number initially provided. Some systems have safeguards to kill any process demanding 99% of the memory, but otherwise this may crash a computer. In those cases, it is advisable to split the dataset or just run `jellyfish count` on a faction of the reads, such as the left or right reads alone. In both cases, the counts are then combined using the `jellyfish merge` command:
 
 `jellyfish merge -o combined.counts left.counts right.counts`
 
