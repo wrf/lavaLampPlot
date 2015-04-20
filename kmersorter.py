@@ -54,9 +54,6 @@ import os
 import subprocess
 from itertools import izip
 
-#==> SRR1032106_1.left.fa.k31.stats <==
-#1	1	0	0	SRR1032106.1.1/H	thread:0
-
 def filter_coverage(pairstats, above, below, keptAccs, stdCutoff):
 	# this part is a blatant rip off of Trinity's nbkc_normalize.pl script
 	total_lines = 0
@@ -117,7 +114,7 @@ def collect_reads(accessionDict, left, right, left_filt, right_filt, lc=4):
 				writeline = False
 	print >> sys.stderr, "Counted %d and wrote %d lines" % (lineCount, writeCount), time.asctime()
 	print >> sys.stderr, "Counted %d and wrote %d sequence pairs" % (pairCount, writePairs), time.asctime()
-			
+
 def main(argv, wayout):
 	if not len(argv):
 		argv.append("-h")
