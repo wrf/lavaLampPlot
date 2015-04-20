@@ -26,13 +26,25 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
   
    `-s` is the memory buffer, 1 billion is safe for many analyses, though the array will expand if it is maxed out. This can consume a lot of memory (30-50Gb), so it is not advisable to run on a laptop. `-U` is the max coverage to count. 1000 will catch mostly transposons. `-t` is the thread count. `-C` refers to canonical counting, meaning both + and - strands.
 
-2. Write out kmers with coverage counts. This file can be massive (50+Gb) so it is instead piped through the python script. `-k` and `-u` are kmer size and max coverage from jellyfish. This step is a single process, so can take some time for very large files with 1 billion+ kmers (20-30 minutes). This generates a matrix of GC vs coverage across all kmers, where the value at each position is the number of unique kmers with that GC and coverage. This is run through python so that R does not have to deal with the counting in addition to the graphing.
+2. Write out kmers with coverage counts. This file can be massive (50Gb+) so it is instead piped through the python script. `-k` and `-u` are kmer size and max coverage from jellyfish. This step is a single process, so can take some time for very large files with 1 billion+ kmers (20-30 minutes). This generates a matrix of GC vs coverage across all kmers, where the value at each position is the number of unique kmers with that GC and coverage. This is run through python so that R does not have to deal with the counting in addition to the graphing.
    
    `jellyfish dump fastq.counts | fastqdumps2histo.py -k 31 -u 1000 - > fastq.gc_cov.histo.csv`
 
 3. Configure the R script for this .csv file, and pdf output. Add text to annotate the plot as needed with the  `text(x,y,"important things")` command. The X and Y values correspond to the center position of the X and the GC count (not the percentage). Thus a GC of 25% would be something like 7 or 8 for a kmer of 31. This script can be run interactively in an R environment (such as RKWard or RCommander) or in the command line.
 
    `Rscript jellyfish_gc_coverage_blob_plot_v2.R`
+
+4. Slice out sections of reads based on kmer coverage. This requires finally generating the jellyfish dump file, so that will be redone first. Then `-T` (Trinity mode) is called with kmersorter. This generates a table of median coverage per read, which would be used in Trinity to randomly normalize the data based on coverage. Instead, here it uses the same method to deterministically keep reads with coverage above or below some specified value (`-a` and `-b`, respectively). Specify the kmer used with `-k`. The Trinity base directory is given with `-D`. Some of the subprocesses can use multithreads, which is specified by `-p`. The sorting step requires a memory limit, which is `-m`; note that the most memory intensive step, fastaToKmerCoverageStats, may exceed this limit as it reads the entire fastq.dumps file into memory.
+
+   `jellyfish dump fastq.counts > fastq.dumps`
+   
+   `kmersorter.py -T -k 31 -m 20G -p 8 -a 100 -b 200 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
+
+5. Generate a more precise coverage to GC map using the entire read rather than kmers. This is run similarly as before with some alternate options in fastqdumps2histo. As above, Trinity mode is specified with `-T`. The intermediate stats files from kmersorter are then used with the raw reads to count the coverage and GC. The `-k` value here is the length of the reads, not the kmer length.
+
+   `fastqdumps2histo.py -s reads_1.stats reads_2.stats -f reads_1.fq reads_2.fq -k 100 -u 1000 -T - > reads.gc_cov.histo.csv`
+
+6. Run the R script on this .csv file as above.
 
 ## Usage considerations
 #### Choosing k-mer length
@@ -55,6 +67,11 @@ Note that when using merge, the `-u` option for fastqdumps2histo must be changed
 The merging generates counts that are slightly different from counting them as a single set, on the order of 0.001% *more* when separate sets were merged than when counted as a single set. This is after excluding those above the counts cutoff for the single set (which might account for 0.01%). I have no explanation for this.
 
 The manual from jellyfish v1 implies that if the output file is not specified with `-o`, jellyfish should create an extra output file with the default name ("output_") when the hash size is full. I have not tested if this works for sparing memory usage.
+
+#### SRA Files
+The Trinity mode in kmersorter has a problem with the SRA headers generated from the [SRA Toolkit](http://www.ncbi.nlm.nih.gov/books/NBK158900/) fastq-dump (due to problems in the called Trinity scripts). The stats file generation will work normally, but then the stats cannot be sorted correctly and ultimately the process will fail merging the stats. Brian Haas suggested this alternate command to generate the header (which one would also use during Trinity normalization).
+
+`fastq-dump --split-files --defline-seq '@$sn[_$rn]/$ri' SRR1032106.sra`
 
 ## Misc
 As this is not really published work, citing is probably not necessary. Nonetheless, it may be advisable to say that any figures were created using this repo, something like "used lavaLampPlot python and R scripts by WRF".
