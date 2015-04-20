@@ -54,7 +54,7 @@ colorcount = 1000
 # 10 percent of the colors are for white to pink, the rest through the rainbow
 white2pink = colorcount*0.1
 pink2red = colorcount*0.9
-colorset = c(colorRampPalette(c("#FFFFFF","#FF00FF"),alpha=0.9)(white2pink), rainbow(pink2red, s=0.95, e=0.93, v=0.75, alpha=0.9) )
+colorset = c(colorRampPalette(c("#FFFFFF","#FF00FF"),alpha=0.9)(white2pink), rainbow(pink2red, start=0.93, end=0.91, v=0.8, alpha=0.9) )
 
 # for coverage heatmap
 ### MUST UNCOMMENT FOR PDF OUTPUT
