@@ -214,8 +214,8 @@ def main(argv, wayout):
 					seqType = "fastq"
 				else:
 					print >> sys.stderr, "# Error unknown header type, %s" % (headerType)
-				print >> sys.stderr, "# Exiting", time.asctime()
-				sys.exit()
+					print >> sys.stderr, "# Exiting", time.asctime()
+					sys.exit()
 				print >> sys.stderr, "# Detected seq type %s... OK" % (seqType)
 			elif args.type=="fastq":
 				seqType = args.type
