@@ -49,7 +49,7 @@ fastqdumps2histo.py -f *.fastq -s *.stats -k 100 -u 1000 -T - > histo.csv
     -f are the original fastq reads (use wildcard or list multiple)
        this could also be a subset of the original reads
     -s are the .stats files for each read
-    -t to use fasta read files (-t fasta)
+    -t to specify fasta read files (-t fasta)
     -T - must set both -T for Trinity mode and - for null input
 """
 
@@ -78,6 +78,12 @@ def add_cov_to_acc(line, statDict):
 def fastx_line_acc(line):
 	return line.rstrip().split(" ")[0][1:]
 
+def get_fastx_type(seqsFile):
+	with open(seqsFile, 'r') as lr:
+		headerType = lr.readline()[0]
+		seqLength = len(lr.readline().rstrip())
+	return headerType, seqLength
+
 def main(argv, wayout):
 	if not len(argv):
 		argv.append("-h")
@@ -85,32 +91,38 @@ def main(argv, wayout):
 	parser.add_argument('input_file', type = argparse.FileType('rU'), default='-', help="fasta format file")
 	parser.add_argument('-d', '--delimiter', default=",", help="use alternate delimiter [,]")
 	parser.add_argument('-f', '--fastx', nargs='*', help="fastx files, either fasta or fastq")
-	parser.add_argument('-k', '--kmer', type=int, metavar='N', default=25, help="kmer length, or read length in Trinity mode [25]")
+	parser.add_argument('-k', '--kmer', type=int, metavar='N', default=25, help="kmer length [25]")
+	parser.add_argument('-r', '--read-length', type=int, metavar='N', help="read length for Trinity mode [auto-detect]")
 	parser.add_argument('-s', '--stats', nargs='*', help="Trinity stats files")
-	parser.add_argument('-t', '--type', default="fastq", choices=["fasta", "fastq"], help="sequence type, fasta or [fastq]")
+	parser.add_argument('-t', '--type', help="sequence type, fasta, fastq or [auto-detect]")
 	parser.add_argument('-T', '--trinity', action="store_true", help="use Trinity method to extract reads")
 	parser.add_argument('-u', '--upper', type=int, metavar='N', default=1000, help="upper limit for histogram [1000]")
 	args = parser.parse_args(argv)
 
-	# generate kmer x maximum matrix
-	m = [[0 for x in range(args.upper+1)] for y in range(args.kmer+1)]
+	# gc and freq are set by default to 0, in case the reads cannot be parsed
+	gc, freq = 0, 0
 	kmercount = 0
 	maxcount = 0
 	kmertag = "kmers"
 
 	if args.trinity:
-		# checking for sequence type and getting basic parameters of sequence parsing
-		if args.type=="fastq":
-			LC = 4
-			FH = "@"
-		else: # otherwise args.type=="fasta"
-			LC = 2
-			FH = ">"
 		# checking for matching stats and fastx files
 		if len(args.stats) != len(args.fastx):
 			print >> sys.stderr, "ERROR Unequal numbers of stats and %s files" % args.type, time.asctime()
 			print >> sys.stderr, "Exiting", time.asctime()
 			sys.exit()
+		# autodetect length and header type from fastx files
+		FH, seqLen = get_fastx_type(args.fastx[0])
+		# checking for sequence type and getting basic parameters of sequence parsing
+		if (FH=="@" or args.type=="fastq"):
+			LC = 4
+		else: # otherwise args.type=="fasta"
+			LC = 2
+		# overwri
+		if args.read_length:
+			seqLen = args.read_length
+		# generate kmer x maximum matrix, using kmer length as ymax
+		m = [[0 for x in range(args.upper+1)] for y in range(seqLen+1)]
 		for statfile, fastxfile in izip(args.stats, args.fastx):
 			statDict = {}
 			print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
@@ -133,9 +145,16 @@ def main(argv, wayout):
 					except IndexError:
 						# most likely reason for this is setting -k to kmer rather than read length
 						maxcount += 1
+					except UnboundLocalError:
+						# this happened when freq was called before assignment
+						print >> sys.stderr, "ERROR Check data type", time.asctime()
+						# possibly wrong data type, no point continuing
+						sys.exit()
 					linecount = 0
 		kmertag = "reads"
 	else:
+		# generate kmer x maximum matrix, using kmer length as ymax
+		m = [[0 for x in range(args.upper+1)] for y in range(args.kmer+1)]
 		print >> sys.stderr, "Reading fastq dumps", time.asctime()
 		for line in args.input_file:
 			# assumes jellyfish dump is in fasta format of kmers where header is count
