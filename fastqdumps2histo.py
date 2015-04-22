@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 #
-# fastqdumps2histo.py v1.2 last modified 2015-04-20
+# fastqdumps2histo.py v1.2 last modified 2015-04-22
 # by WRF
 
 """
-fastqdumps2histo.py v1.2 2015-04-20
+fastqdumps2histo.py v1.2 2015-04-22
 
     first generate fastq.counts file from zipped reads with jellyfish count
 gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G /dev/fd/0
@@ -46,8 +46,10 @@ fastqdumps2histo.py -f *.fastq -s *.stats -k 100 -u 1000 -T - > histo.csv
 
     -k must be set to the read length, not the original kmer length
     -u is set as above
-    -f are the original fastq reads (use wildcard or list both)
+    -f are the original fastq reads (use wildcard or list multiple)
+       this could also be a subset of the original reads
     -s are the .stats files for each read
+    -t to use fasta read files (-t fasta)
     -T - must set both -T for Trinity mode and - for null input
 """
 
@@ -66,12 +68,14 @@ def add_cov_to_acc(line, statDict):
 	splits = line.split("\t")
 	# lines of stats file look like:
 	#12	17.6632	10.3014	58.3215	HISEQ:150:C5KTJANXX:4:1101:1469:1959/1	thread:5
+	# or this for SRA files:
+	#53	57.4143	16.8252	29.3049	SRR1032106.2000.1/H	thread:5
 	medCov = int(splits[0])
 	acc = splits[4].split("/")[0]
 	statDict[acc] = medCov
 	# nothing to return
 
-def fastq_line_acc(line):
+def fastx_line_acc(line):
 	return line.rstrip().split(" ")[0][1:]
 
 def main(argv, wayout):
@@ -80,9 +84,10 @@ def main(argv, wayout):
 	parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
 	parser.add_argument('input_file', type = argparse.FileType('rU'), default='-', help="fasta format file")
 	parser.add_argument('-d', '--delimiter', default=",", help="use alternate delimiter [,]")
-	parser.add_argument('-f', '--fastq', nargs='*', help="fastq files")
+	parser.add_argument('-f', '--fastx', nargs='*', help="fastx files, either fasta or fastq")
 	parser.add_argument('-k', '--kmer', type=int, metavar='N', default=25, help="kmer length, or read length in Trinity mode [25]")
 	parser.add_argument('-s', '--stats', nargs='*', help="Trinity stats files")
+	parser.add_argument('-t', '--type', default="fastq", choices=["fasta", "fastq"], help="sequence type, fasta or [fastq]")
 	parser.add_argument('-T', '--trinity', action="store_true", help="use Trinity method to extract reads")
 	parser.add_argument('-u', '--upper', type=int, metavar='N', default=1000, help="upper limit for histogram [1000]")
 	args = parser.parse_args(argv)
@@ -94,23 +99,30 @@ def main(argv, wayout):
 	kmertag = "kmers"
 
 	if args.trinity:
-		if len(args.stats) != len(args.fastq):
-			print >> sys.stderr, "ERROR Unequal numbers of stats files and fastq", time.asctime()
+		# checking for sequence type and getting basic parameters of sequence parsing
+		if args.type=="fastq":
+			LC = 4
+			FH = "@"
+		else: # otherwise args.type=="fasta"
+			LC = 2
+			FH = ">"
+		# checking for matching stats and fastx files
+		if len(args.stats) != len(args.fastx):
+			print >> sys.stderr, "ERROR Unequal numbers of stats and %s files" % args.type, time.asctime()
 			print >> sys.stderr, "Exiting", time.asctime()
 			sys.exit()
-		for statfile, fastqfile in izip(args.stats, args.fastq):
+		for statfile, fastxfile in izip(args.stats, args.fastx):
 			statDict = {}
 			print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
 			for line in open(statfile, 'r'):
 				add_cov_to_acc(line, statDict)
-			print >> sys.stderr, "Reading fastq file %s" % fastqfile, time.asctime()
+			print >> sys.stderr, "Reading %s file %s" % (args.type, fastxfile), time.asctime()
 			linecount = 0
-			LC = 4
-			for line in open(fastqfile, 'r'):
+			for line in open(fastxfile, 'r'):
 				linecount += 1
-				if linecount==1 and line[0]=="@":
+				if linecount==1 and line[0]==FH:
 					kmercount += 1
-					acc = fastq_line_acc(line)
+					acc = fastx_line_acc(line)
 					freq = statDict.get(acc, 0)
 				if linecount==2:
 					gc = get_gc(line)
