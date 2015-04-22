@@ -54,6 +54,15 @@ import os
 import subprocess
 from itertools import izip
 
+def get_gc(kmer):
+	return kmer.count("G")+kmer.count("C")
+
+def check_gc(gc, strong, weak):
+	return (weak >= gc >= strong)
+
+def fastq_line_acc(line):
+	return line.rstrip().split(" ")[0][1:]
+
 def filter_coverage(pairstats, above, below, keptAccs, stdCutoff):
 	# this part is a blatant rip off of Trinity's nbkc_normalize.pl script
 	total_lines = 0
@@ -82,38 +91,55 @@ def filter_coverage(pairstats, above, below, keptAccs, stdCutoff):
 	print >> sys.stderr, "{} / {} = {:.2f} % reads with no coverage".format(nocovCount, total_lines, nocovCount*100.0/total_lines )
 	return accessionDict
 
-def collect_reads(accessionDict, left, right, left_filt, right_filt, lc=4):
-	# this is assuming that files are fastq and thus 4 lines per read
-	# linenum should have values only of 0 through lc (which is 4)
+def collect_reads(accessionDict, left, right, left_filt, right_filt, strong, weak, seqtype):
+	if seqtype == "fastq":
+		FH = "@"
+		LC = 4
+	else:
+		FH = ">"
+		LC = 2
+	# linenum should have values only of 0 through LC (which is normally 4)
 	linenum = 0
 	pairCount, writePairs = 0, 0
 	lineCount, writeCount = 0, 0
-	writeline = False
+	covPassCount = 0
+	passCoverage, passGC = False, False
 	print >> sys.stderr, "Retained %d accessions" % (len(accessionDict) ), time.asctime()
 	with open(left_filt, 'w') as lf, open(right_filt, 'w') as rf:
 		for line1, line2 in izip( open(left,'r'), open(right,'r') ):
 			lineCount += 1
 			linenum += 1
 			# check if this is the first line in the quartet, and that the first character is '@'
-			if linenum == 1 and line1[0] == "@":
+			if linenum == 1 and line1[0] == FH:
 				pairCount += 1
-				acc = line1.split(' ')[0][1:]
+				acc1, acc2 = line1, line2
 				# if that acc is in the dictionary of reads to keep from the previous step
 				# it should return True, otherwise the default is False
-				writeline = accessionDict.get(acc, False)
-				# if writing, add to writePairs which should finally equal the length of the dictionary
-				if writeline:
+				passCoverage = accessionDict.get(fastq_line_acc(line1), False)
+				# this will either add 0 or 1 to covPassCount
+				covPassCount += int(passCoverage)
+			if passCoverage and linenum == 2:
+				gc1, gc2 = get_gc(line1), get_gc(line2)
+				if check_gc(gc1, strong, weak) or check_gc(gc2, strong, weak):
+					passGC = True
+					# if writing, add to writePairs which should finally equal the length of the dictionary
 					writePairs += 1
-			if writeline:
+					writeCount += 1
+					# write the previous line and add 1 to the count if it passes
+					lf.write(acc1)
+					rf.write(acc2)
+					# then write the current line containing the sequence, and carry on
+			if passCoverage and passGC:
 				writeCount += 1
 				lf.write(line1)
 				rf.write(line2)
-			# regardless if anything was written, reset linenum and writeline after 4 lines
-			if linenum == lc:
+			# regardless if anything was written, reset linenum and passCoverage after 4 lines
+			if linenum == LC:
 				linenum = 0
-				writeline = False
+				passCoverage, passGC = False, False
 	print >> sys.stderr, "Counted %d and wrote %d lines" % (lineCount, writeCount), time.asctime()
-	print >> sys.stderr, "Counted %d and wrote %d sequence pairs" % (pairCount, writePairs), time.asctime()
+	print >> sys.stderr, "Counted %d sequence pairs" % (pairCount), time.asctime()
+	print >> sys.stderr, "%d sequence pairs passed coverage, %d passed GC" % (covPassCount, writeCount), time.asctime()
 
 def main(argv, wayout):
 	if not len(argv):
@@ -125,7 +151,7 @@ def main(argv, wayout):
 	parser.add_argument('-b', '--below', type=int, metavar='N', default=10000, help="retrieve kmers with a count less than N [10000]")
 	parser.add_argument('-s', '--strong', type=float, metavar='0.F', default=0.0, help="retrieve kmers with GC percent greater than N [0.0]")
 	parser.add_argument('-w', '--weak', type=float, metavar='0.F', default=1.0, help="retrieve kmers with GC percent less than N [1.0]")
-	parser.add_argument('-t', '--type', help="line numbering by fasta or fastq [default: fastq]", default='fastq')
+	parser.add_argument('-t', '--type', help="input files and line numbering are fasta or fastq [auto-detect]", default='auto')
 	parser.add_argument('-k', '--kmer', type=int, metavar='N', default=25, help="kmer length [25]")
 	parser.add_argument('-l', '--lowercase', action="store_true", help="convert sequences to lowercase")
 	parser.add_argument('-1', '--left-reads', help="fastq reads 1 of a pair")
@@ -135,12 +161,18 @@ def main(argv, wayout):
 	parser.add_argument('-c', '--stdev-cutoff', type=int, metavar='N', default=200, help="upper limit for standard deviation cutoff [200]")
 	parser.add_argument('-m', '--memory', default="1G", help="memory usage maximum [1G]")
 	parser.add_argument('-p', '--processors', type=int, metavar='N', default=1, help="number of CPUs [1]")
+	parser.add_argument('-S', '--stats', action="store_false", help="only collect left and right stats in Trinity mode")
 	args = parser.parse_args(argv)
 
 	keepcov = 0
 	keepgc = 0
 	kmercount = 0
 	freqsum = 0
+
+	if args.strong > 1 or args.weak > 1:
+		print >> sys.stderr, "# ERROR -s and -w must be a float between 0.0 and 1.0"
+		print >> sys.stderr, "# Exiting", time.asctime()
+		sys.exit()
 
 	if args.trinity:
 		print >> sys.stderr, "### Running Trinity type read sorting", time.asctime()
@@ -171,6 +203,28 @@ def main(argv, wayout):
 		print >> sys.stderr, "### Checking input files", time.asctime()
 		if os.path.isfile(args.left_reads) and os.path.isfile(args.right_reads):
 			print >> sys.stderr, "# Reads found... OK"
+			with open(args.left_reads, 'r') as lr:
+				headerType = lr.readline()[0]
+				seqLength = len(lr.readline().rstrip())
+			print >> sys.stderr, "# Detected read length of %d... OK" % (seqLength)
+			if args.type=="auto":
+				if headerType == ">":
+					seqType = "fasta"
+				elif headerType == "@":
+					seqType = "fastq"
+				else:
+					print >> sys.stderr, "# Error unknown header type, %s" % (headerType)
+				print >> sys.stderr, "# Exiting", time.asctime()
+				sys.exit()
+				print >> sys.stderr, "# Detected seq type %s... OK" % (seqType)
+			elif args.type=="fastq":
+				seqType = args.type
+			elif args.type=="fasta":
+				seqType = args.type
+			else:
+				print >> sys.stderr, "# Error unknown sequence type, %s" % (args.type)
+				print >> sys.stderr, "# Exiting", time.asctime()
+				sys.exit()
 		else:
 			print >> sys.stderr, "# Cannot find input reads %s, %s" % (args.left_reads, args.right_reads)
 			print >> sys.stderr, "# Exiting", time.asctime()
@@ -178,17 +232,22 @@ def main(argv, wayout):
 
 		# most of this pipeline is copied from Trinity insilico_read_normalization.pl
 		print >> sys.stderr, "### Converting reads to fasta", time.asctime()
-		left_reads = "%s.left.fa" % (os.path.splitext(args.left_reads)[0])
-		right_reads = "%s.right.fa" % (os.path.splitext(args.right_reads)[0])
-		if os.path.isfile(left_reads) and os.path.isfile(right_reads):
-			print >> sys.stderr, "# Reads already converted, skipping...", time.asctime()
+		if seqType == "fasta":
+			print >> sys.stderr, "# Input type already fasta, skipping...", time.asctime()
+			left_reads = args.left_reads
+			right_reads = args.right_reads
 		else:
-			fastool_args = [fastool_path, "--illumina-trinity", "--to-fasta", args.left_reads]
-			with open(left_reads, 'a') as lr:
-				subprocess.call(fastool_args, stdout=lr)
-			fastool_args = [fastool_path, "--illumina-trinity", "--to-fasta", args.right_reads]
-			with open(right_reads, 'a') as rr:
-				subprocess.call(fastool_args, stdout=rr)
+			left_reads = "%s.left.fa" % (os.path.splitext(args.left_reads)[0])
+			right_reads = "%s.right.fa" % (os.path.splitext(args.right_reads)[0])
+			if os.path.isfile(left_reads) and os.path.isfile(right_reads):
+				print >> sys.stderr, "# Reads already converted, skipping...", time.asctime()
+			else:
+				fastool_args = [fastool_path, "--illumina-trinity", "--to-fasta", args.left_reads]
+				with open(left_reads, 'a') as lr:
+					subprocess.call(fastool_args, stdout=lr)
+				fastool_args = [fastool_path, "--illumina-trinity", "--to-fasta", args.right_reads]
+				with open(right_reads, 'a') as rr:
+					subprocess.call(fastool_args, stdout=rr)
 
 		print >> sys.stderr, "### Generating coverage stats", time.asctime()
 		left_stats = "%s.k%d.stats" % (left_reads, args.kmer)
@@ -205,40 +264,47 @@ def main(argv, wayout):
 			with open(right_stats, 'w') as rs:
 				subprocess.call(kmertocov_args, stdout=rs)
 
-		print >> sys.stderr, "### Sorting stats by read name", time.asctime()
-		left_sorted = "%s.sort" % left_stats
-		right_sorted = "%s.sort" % right_stats
-		if os.path.isfile(left_sorted) and os.path.isfile(right_sorted):
-			print >> sys.stderr, "# Stats already sorted, skipping...", time.asctime()
-		else:
-			print >> sys.stderr, "# Sorting left stats:", left_stats, time.asctime()
-			sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, left_stats]
-			with open(left_sorted, 'w') as lo:
-				subprocess.call(sort_args, stdout=lo)
-			print >> sys.stderr, "# Sorting right stats:", right_stats, time.asctime()
-			sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, right_stats]
-			with open(right_sorted, 'w') as ro:
-				subprocess.call(sort_args, stdout=ro)
+		if args.stats:
+			# the value of this step is in question
+			print >> sys.stderr, "### Sorting stats by read name", time.asctime()
+			left_sorted = "%s.sort" % left_stats
+			right_sorted = "%s.sort" % right_stats
+			if os.path.isfile(left_sorted) and os.path.isfile(right_sorted):
+				print >> sys.stderr, "# Stats already sorted, skipping...", time.asctime()
+			else:
+				print >> sys.stderr, "# Sorting left stats:", left_stats, time.asctime()
+				sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, left_stats]
+				with open(left_sorted, 'w') as lo:
+					subprocess.call(sort_args, stdout=lo)
+				print >> sys.stderr, "# Sorting right stats:", right_stats, time.asctime()
+				sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, right_stats]
+				with open(right_sorted, 'w') as ro:
+					subprocess.call(sort_args, stdout=ro)
 
-		print >> sys.stderr, "### Merging left and right stats", time.asctime()
-		paired_stats = "%s_pairs.k%d.stats" % (args.left_reads.split("_")[0], args.kmer)
-		if os.path.isfile(paired_stats):
-			print >> sys.stderr, "# Stats already merged, skipping...", time.asctime()
-		else:
-			mergeLR_args = ["perl", mergeLR_path, "--left", left_sorted, "--right", right_sorted, "--sorted"]
-			with open(paired_stats, 'w') as ps:
-				subprocess.call(mergeLR_args, stdout=ps)
-			print >> sys.stderr, "# Done merging", time.asctime()
+			print >> sys.stderr, "### Merging left and right stats", time.asctime()
+			# this merging takes the average of the left and right, rounding up
+			paired_stats = "%s_pairs.k%d.stats" % (args.left_reads.split("_")[0], args.kmer)
+			if os.path.isfile(paired_stats):
+				print >> sys.stderr, "# Stats already merged, skipping...", time.asctime()
+			else:
+				mergeLR_args = ["perl", mergeLR_path, "--left", left_sorted, "--right", right_sorted, "--sorted"]
+				with open(paired_stats, 'w') as ps:
+					subprocess.call(mergeLR_args, stdout=ps)
+				print >> sys.stderr, "# Done merging", time.asctime()
 
-		print >> sys.stderr, "### Sorting read pairs by coverage", time.asctime()
-		print >> sys.stderr, "# Filtering coverage between %d and %d" % (args.above, args.below), time.asctime()
-		core_accs = "%s.k%d.a%d.b%d.sd%d.accs" % (paired_stats, args.kmer, args.above, args.below, args.stdev_cutoff)
-		accessions = filter_coverage(paired_stats, args.above, args.below, core_accs, args.stdev_cutoff)
-		print >> sys.stderr, "# Done filtering", time.asctime()
-		print >> sys.stderr, "### Retrieving reads", time.asctime()
-		left_filt = "%s.k%d.a%d.b%d.sd%d.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, args.above, args.below, args.stdev_cutoff, args.type)
-		right_filt = "%s.k%d.a%d.b%d.sd%d.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, args.above, args.below, args.stdev_cutoff, args.type)
-		collect_reads(accessions, args.left_reads, args.right_reads, left_filt, right_filt)
+			print >> sys.stderr, "### Sorting read pairs by coverage", time.asctime()
+			print >> sys.stderr, "# Filtering coverage between %d and %d" % (args.above, args.below), time.asctime()
+			core_accs = "%s.k%d.a%d.b%d.sd%d.accs" % (paired_stats, args.kmer, args.above, args.below, args.stdev_cutoff)
+			accessions = filter_coverage(paired_stats, args.above, args.below, core_accs, args.stdev_cutoff)
+			print >> sys.stderr, "# Done filtering", time.asctime()
+			print >> sys.stderr, "### Retrieving reads", time.asctime()
+			left_filt = "%s.k%d.a%d.b%d.sd%d.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, args.above, args.below, args.stdev_cutoff, seqType)
+			right_filt = "%s.k%d.a%d.b%d.sd%d.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, args.above, args.below, args.stdev_cutoff, seqType)
+			# set GC limits, int is needed in case read length is not 100
+			strong = int(seqLength * args.strong + 0.9)
+			weak = int(seqLength * args.weak + 0.9)
+			print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
+			collect_reads(accessions, args.left_reads, args.right_reads, left_filt, right_filt, strong, weak, seqType)
 		print >> sys.stderr, "# Process finished", time.asctime()
 
 	# in kmer mode:
