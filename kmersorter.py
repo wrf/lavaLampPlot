@@ -141,6 +141,22 @@ def collect_reads(accessionDict, left, right, left_filt, right_filt, strong, wea
 	print >> sys.stderr, "Counted %d sequence pairs" % (pairCount), time.asctime()
 	print >> sys.stderr, "%d sequence pairs passed coverage, %d passed GC" % (covPassCount, writeCount), time.asctime()
 
+def get_fastx_type(seqsFile):
+	with open(seqsFile, 'r') as lr:
+		header = lr.readline()[0]
+		seqLen = len(lr.readline().rstrip())
+	return header, seqLen
+
+def fastx_header_to_type(header):
+	if header == ">":
+		return "fasta"
+	elif header == "@":
+		return "fastq"
+	else:
+		print >> sys.stderr, "# Error unknown header type, %s" % (header)
+		print >> sys.stderr, "# Exiting", time.asctime()
+		sys.exit()
+
 def main(argv, wayout):
 	if not len(argv):
 		argv.append("-h")
@@ -203,19 +219,10 @@ def main(argv, wayout):
 		print >> sys.stderr, "### Checking input files", time.asctime()
 		if os.path.isfile(args.left_reads) and os.path.isfile(args.right_reads):
 			print >> sys.stderr, "# Reads found... OK"
-			with open(args.left_reads, 'r') as lr:
-				headerType = lr.readline()[0]
-				seqLength = len(lr.readline().rstrip())
+			headerType, seqLength = get_fastx_type(args.left_reads)
 			print >> sys.stderr, "# Detected read length of %d... OK" % (seqLength)
 			if args.type=="auto":
-				if headerType == ">":
-					seqType = "fasta"
-				elif headerType == "@":
-					seqType = "fastq"
-				else:
-					print >> sys.stderr, "# Error unknown header type, %s" % (headerType)
-					print >> sys.stderr, "# Exiting", time.asctime()
-					sys.exit()
+				seqType = fastx_header_to_type(headerType)
 				print >> sys.stderr, "# Detected seq type %s... OK" % (seqType)
 			elif args.type=="fastq":
 				seqType = args.type
