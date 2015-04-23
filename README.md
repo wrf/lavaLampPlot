@@ -32,14 +32,20 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
    
    `jellyfish dump fastq.counts | fastqdumps2histo.py -k 31 -u 1000 - > fastq.gc_cov.histo.csv`
 
+   If the Trinity mode steps (4 and 5) will eventually be carried out, then the jellyfish kmer dump is required. A filtered version where kmers with a count of 1 have been removed can be generated using the `-j` option.
+   
+   `jellyfish dump fastq.counts | fastqdumps2histo.py -k 31 -u 1000 -j fastq.dumps - > fastq.gc_cov.histo.csv`
+
 3. Configure the R script for this .csv file, and pdf output. Add text to annotate the plot as needed with the  `text(x,y,"important things")` command. The X and Y values correspond to the center position of the X and the GC count (not the percentage). Thus a GC of 25% would be something like 7 or 8 for a kmer of 31. This script can be run interactively in an R environment (such as RKWard or RCommander) or in the command line.
 
    `Rscript jellyfish_gc_coverage_blob_plot_v2.R`
 
-4. Slice out sections of reads based on kmer coverage. This requires finally generating the jellyfish dump file, so that will be redone first. Then `-T` (Trinity mode) is called with kmersorter. This generates a table of median coverage per read, which would be used in Trinity to randomly normalize the data based on coverage. Instead, here it uses the same method to deterministically keep reads with coverage above or below some specified value (`-a` and `-b`, respectively). Specify the kmer used with `-k`. The Trinity base directory is given with `-D`. Some of the subprocesses can use multithreads, which is specified by `-p`. The sorting step requires a memory limit, which is `-m`; note that the most memory intensive step, fastaToKmerCoverageStats, may exceed this limit as it reads the entire fastq.dumps file into memory.
+4. Slice out sections of reads based on kmer coverage. This requires finally generating the jellyfish dump file, so that will be redone first if it was not done at the earlier step. 
 
    `jellyfish dump fastq.counts > fastq.dumps`
-   
+
+   Then `-T` (Trinity mode) is called with kmersorter. This generates a table of median coverage per read, which would be used in Trinity to randomly normalize the data based on coverage. Instead, here it uses the same method to deterministically keep reads with coverage above or below some specified value (`-a` and `-b`, respectively). Specify the kmer used with `-k`. The Trinity base directory is given with `-D`. Some of the subprocesses can use multithreads, which is specified by `-p`. The sorting step requires a memory limit, which is `-m`; note that the most memory intensive step, fastaToKmerCoverageStats, may exceed this limit as it reads the entire fastq.dumps file into memory.
+
    `kmersorter.py -T -k 31 -m 20G -p 8 -a 100 -b 200 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
 
 5. Generate a more precise coverage to GC map using the entire read rather than kmers. This is run similarly as before with some alternate options in fastqdumps2histo. As above, Trinity mode is specified with `-T`. The intermediate stats files from kmersorter are then used with the raw reads to count the coverage and GC. The `-k` value here is the length of the reads, not the kmer length.
