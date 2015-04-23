@@ -14,17 +14,19 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
 ## Operation
 1. Run jellyfish on the raw genomic data.
    
-   `jellyfish count -m 31 -s 1000000000 -C -o fastq.counts -U 1000 -t 8 all_reads.fastq`
+   `jellyfish count -m 31 -s 2G -C -o fastq.counts -U 1000 -t 8 all_reads.fastq`
   
    data can also be piped, in which case you must provide the input `/dev/fd/0` (or `/dev/stdin`):
    
-   `cat *.fastq | jellyfish count -m 31 -s 1000000000 -C -o fastq.counts -U 1000 -t 8 /dev/fd/0`
+   `cat *.fastq | jellyfish count -m 31 -s 2G -C -o fastq.counts -U 1000 -t 8 /dev/fd/0`
    
    or unzipped in real time:
   
-   `gzip -dc *.fastq.gz | jellyfish count -m 31 -s 1000000000 -C -o fastq.counts -U 1000 -t 8 /dev/fd/0`
+   `gzip -dc *.fastq.gz | jellyfish count -m 31 -s 2G -C -o fastq.counts -U 1000 -t 8 /dev/fd/0`
   
-   `-s` is the memory buffer, 1 billion is safe for many analyses, though the array will expand if it is maxed out. This can consume a lot of memory (30-50Gb), so it is not advisable to run on a laptop. `-U` is the max coverage to count. 1000 will catch mostly transposons. `-t` is the thread count. `-C` refers to canonical counting, meaning both + and - strands.
+   `-s` is the memory buffer, 2G (2 billion, or 2000000000) is safe for many analyses, though the array will expand if it is maxed out. This can consume a lot of memory (30-50Gb), so it is not advisable to run on a laptop. `-U` is the max coverage to count. 1000 will catch mostly transposons. `-t` is the thread count. `-C` refers to canonical counting, meaning both + and - strands. 
+
+   Optionally, a lower limit can be set with `-L`. For generating kmer plots (step 3 below) this would affect the data and not be advised, but for the read plots (steps 4 and 5), the Trinity program fastaToKmerCoverageStats assumes that any values below 2 are 1. Since the bulk of the kmers have a count of 1 (66% in the *Hydra* sample), this makes a much smaller file and will run faster at subsequent steps.
 
 2. Write out kmers with coverage counts. This file can be massive (easily 50Gb+, 83G for *Hydra* SRR1032106) so it is instead piped through the python script. `-k` and `-u` are kmer size and max coverage from jellyfish. This step is a single process, so can take some time for very large files with 1 billion+ kmers (20-30 minutes). This generates a matrix of GC vs coverage across all kmers, where the value at each position is the number of unique kmers with that GC and coverage. This is run through python so that R does not have to deal with the counting in addition to the graphing.
    
@@ -62,7 +64,7 @@ followed by running `jellyfish dump` and the python script as above:
 
 `jellyfish dump combined.counts | fastqdumps2histo.py -k 31 -u 2000 - > combined.gc_cov.histo.csv`
 
-Note that when using merge, the `-u` option for fastqdumps2histo must be changed accordingly, probably multiplied for each file that is merged. If this was two files with `-U 1000`, then set the value to 2000 rather than 1000. Also, the hash size (`-s`) must be the same for all files in the merge, so pick something large enough, maybe 3G (3 billion) if you have the memory.
+Note that when using merge, the `-u` option for fastqdumps2histo must be changed accordingly, probably multiplied for each file that is merged. If this was two files with `-U 1000`, then set the value to 2000 rather than 1000. Also, the hash size (`-s`) must be the same for all files in the merge, so pick something large enough, maybe 4G (4 billion) if you have the memory.
 
 The merging generates counts that are slightly different from counting them as a single set, on the order of 0.001% *more* when separate sets were merged than when counted as a single set. This is after excluding those above the counts cutoff for the single set (which might account for 0.01%). I have no explanation for this.
 
