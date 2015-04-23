@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 #
-# fastqdumps2histo.py v1.2 last modified 2015-04-22
+# fastqdumps2histo.py v1.2 last modified 2015-04-23
 # by WRF
 
 """
-fastqdumps2histo.py v1.2 2015-04-22
+fastqdumps2histo.py v1.2 2015-04-23
 
     first generate fastq.counts file from zipped reads with jellyfish count
 gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G /dev/fd/0
@@ -21,6 +21,12 @@ gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G
     jellyfish dump output would normally be quite large, so it is piped
     then use jellyfish dump command as stdin
 jellyfish dump fastq.counts | fastqdumps2histo.py - > histo.csv
+
+    because some downstream steps require the jellyfish dump, but can exclude
+    entries with a value of 1, a filtered jellyfish dump can be created
+    as it is read in the piped input, using the -j option
+
+jellyfish dump fastq.counts | fastqdumps2histo.py -j fastq.dumps - > histo.csv
 
     otherwise use as input file
 fastqdumps2histo.py fastq.dumps > histo.csv
@@ -91,7 +97,9 @@ def main(argv, wayout):
 	parser.add_argument('input_file', type = argparse.FileType('rU'), default='-', help="fasta format file")
 	parser.add_argument('-d', '--delimiter', default=",", help="use alternate delimiter [,]")
 	parser.add_argument('-f', '--fastx', nargs='*', help="fastx files, either fasta or fastq")
+	parser.add_argument('-j', '--jellyfish', help="optional file for the filtered jellyfish dump")
 	parser.add_argument('-k', '--kmer', type=int, metavar='N', default=25, help="kmer length [25]")
+	parser.add_argument('-l', '--lower', type=int, metavar='N', default=2, help="lower limit for optional jellyfish dump [2]")
 	parser.add_argument('-r', '--read-length', type=int, metavar='N', help="read length for Trinity mode [auto-detect]")
 	parser.add_argument('-s', '--stats', nargs='*', help="Trinity stats files")
 	parser.add_argument('-t', '--type', help="sequence type, fasta, fastq or [auto-detect]")
@@ -153,6 +161,9 @@ def main(argv, wayout):
 					linecount = 0
 		kmertag = "reads"
 	else:
+		if args.jellyfish:
+			jf = open(args.jellyfish, 'w')
+			jfwroteback = 0
 		# generate kmer x maximum matrix, using kmer length as ymax
 		m = [[0 for x in range(args.upper+1)] for y in range(args.kmer+1)]
 		print >> sys.stderr, "Reading fastq dumps", time.asctime()
@@ -173,7 +184,11 @@ def main(argv, wayout):
 				except IndexError:
 					# any values outside of the range of the matrix are thus ignored
 					maxcount += 1
-
+				if args.jellyfish and (args.upper >= freq >= args.lower):
+					jf.write(">{}\n{}".format(freq, seq) )
+					jfwroteback += 1
+		if args.jellyfish:
+			jf.close()
 	print >> sys.stderr, "Writing counts", time.asctime()
 	for i in m:
 		print >> wayout, args.delimiter.join([str(j) for j in i])
@@ -181,6 +196,8 @@ def main(argv, wayout):
 	print >> sys.stderr, "Counted %d %s" % (kmercount, kmertag), time.asctime()
 	if maxcount:
 		print >> sys.stderr, "%d %s exceeded cutoffs" % (maxcount, kmertag), time.asctime()
+	if jfwroteback:
+		print >> sys.stderr, "Wrote %d kmers to %s" % (jfwroteback, args.jellyfish), time.asctime()
 
 if __name__ == "__main__":
 	main(sys.argv[1:],sys.stdout)
