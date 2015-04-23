@@ -139,7 +139,7 @@ def collect_reads(accessionDict, left, right, left_filt, right_filt, strong, wea
 				passCoverage, passGC = False, False
 	print >> sys.stderr, "Counted %d and wrote %d lines" % (lineCount, writeCount), time.asctime()
 	print >> sys.stderr, "Counted %d sequence pairs" % (pairCount), time.asctime()
-	print >> sys.stderr, "%d sequence pairs passed coverage, %d passed GC" % (covPassCount, writeCount), time.asctime()
+	print >> sys.stderr, "%d sequence pairs passed coverage, %d passed GC" % (covPassCount, writePairs), time.asctime()
 
 def get_fastx_type(seqsFile):
 	with open(seqsFile, 'r') as lr:
@@ -272,46 +272,59 @@ def main(argv, wayout):
 				subprocess.call(kmertocov_args, stdout=rs)
 
 		if args.stats:
-			# the value of this step is in question
-			print >> sys.stderr, "### Sorting stats by read name", time.asctime()
-			left_sorted = "%s.sort" % left_stats
-			right_sorted = "%s.sort" % right_stats
-			if os.path.isfile(left_sorted) and os.path.isfile(right_sorted):
-				print >> sys.stderr, "# Stats already sorted, skipping...", time.asctime()
+			if args.above==1 and args.below==10000 and args.strong==0.0 and args.weak==1.0:
+				print >> sys.stderr, "# No cutoffs specified, -a -b -s -w", time.asctime()
+				print >> sys.stderr, "# Exiting", time.asctime()
+				sys.exit()
 			else:
-				print >> sys.stderr, "# Sorting left stats:", left_stats, time.asctime()
-				sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, left_stats]
-				with open(left_sorted, 'w') as lo:
-					subprocess.call(sort_args, stdout=lo)
-				print >> sys.stderr, "# Sorting right stats:", right_stats, time.asctime()
-				sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, right_stats]
-				with open(right_sorted, 'w') as ro:
-					subprocess.call(sort_args, stdout=ro)
+				# the value of this step is in question
+				print >> sys.stderr, "### Sorting stats by read name", time.asctime()
+				left_sorted = "%s.sort" % left_stats
+				right_sorted = "%s.sort" % right_stats
+				if os.path.isfile(left_sorted) and os.path.isfile(right_sorted):
+					print >> sys.stderr, "# Stats already sorted, skipping...", time.asctime()
+				else:
+					print >> sys.stderr, "# Sorting left stats:", left_stats, time.asctime()
+					sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, left_stats]
+					with open(left_sorted, 'w') as lo:
+						subprocess.call(sort_args, stdout=lo)
+					print >> sys.stderr, "# Sorting right stats:", right_stats, time.asctime()
+					sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, right_stats]
+					with open(right_sorted, 'w') as ro:
+						subprocess.call(sort_args, stdout=ro)
 
-			print >> sys.stderr, "### Merging left and right stats", time.asctime()
-			# this merging takes the average of the left and right, rounding up
-			paired_stats = "%s_pairs.k%d.stats" % (args.left_reads.split("_")[0], args.kmer)
-			if os.path.isfile(paired_stats):
-				print >> sys.stderr, "# Stats already merged, skipping...", time.asctime()
-			else:
-				mergeLR_args = ["perl", mergeLR_path, "--left", left_sorted, "--right", right_sorted, "--sorted"]
-				with open(paired_stats, 'w') as ps:
-					subprocess.call(mergeLR_args, stdout=ps)
-				print >> sys.stderr, "# Done merging", time.asctime()
+				print >> sys.stderr, "### Merging left and right stats", time.asctime()
+				# this merging takes the average of the left and right, rounding up
+				paired_stats = "%s_pairs.k%d.stats" % (args.left_reads.split("_")[0], args.kmer)
+				if os.path.isfile(paired_stats):
+					print >> sys.stderr, "# Stats already merged, skipping...", time.asctime()
+				else:
+					mergeLR_args = ["perl", mergeLR_path, "--left", left_sorted, "--right", right_sorted, "--sorted"]
+					with open(paired_stats, 'w') as ps:
+						subprocess.call(mergeLR_args, stdout=ps)
+					print >> sys.stderr, "# Done merging", time.asctime()
 
-			print >> sys.stderr, "### Sorting read pairs by coverage", time.asctime()
-			print >> sys.stderr, "# Filtering coverage between %d and %d" % (args.above, args.below), time.asctime()
-			core_accs = "%s.k%d.a%d.b%d.sd%d.accs" % (paired_stats, args.kmer, args.above, args.below, args.stdev_cutoff)
-			accessions = filter_coverage(paired_stats, args.above, args.below, core_accs, args.stdev_cutoff)
-			print >> sys.stderr, "# Done filtering", time.asctime()
-			print >> sys.stderr, "### Retrieving reads", time.asctime()
-			left_filt = "%s.k%d.a%d.b%d.sd%d.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, args.above, args.below, args.stdev_cutoff, seqType)
-			right_filt = "%s.k%d.a%d.b%d.sd%d.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, args.above, args.below, args.stdev_cutoff, seqType)
-			# set GC limits, int is needed in case read length is not 100
-			strong = int(seqLength * args.strong + 0.9)
-			weak = int(seqLength * args.weak + 0.9)
-			print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
-			collect_reads(accessions, args.left_reads, args.right_reads, left_filt, right_filt, strong, weak, seqType)
+				print >> sys.stderr, "### Sorting read pairs by coverage", time.asctime()
+				print >> sys.stderr, "# Filtering coverage between %d and %d" % (args.above, args.below), time.asctime()
+				coverage_mods = ['']
+				if not args.above==1 or not args.below==10000:
+					coverage_mods.append("a%d.b%d" % (args.above,args.below) )
+				strong = int(seqLength * args.strong + 0.9)
+				weak = int(seqLength * args.weak + 0.9)
+				if not args.strong==0.0 or not args.weak==1.0:
+					coverage_mods.append("s%d.w%d" % (strong,weak) )
+				coverage_string = ".".join(coverage_mods)
+				core_accs = "%s.k%d%s.sd%d.accs" % (paired_stats, args.kmer, coverage_string, args.stdev_cutoff)
+				accessions = filter_coverage(paired_stats, args.above, args.below, core_accs, args.stdev_cutoff)
+				print >> sys.stderr, "# Done filtering", time.asctime()
+				print >> sys.stderr, "### Retrieving reads", time.asctime()
+				left_filt = "%s.k%d%s.sd%d.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, coverage_string, args.stdev_cutoff, seqType)
+				right_filt = "%s.k%d%s.sd%d.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, coverage_string, args.stdev_cutoff, seqType)
+				# set GC limits, int is needed in case read length is not 100
+				strong = int(seqLength * args.strong + 0.9)
+				weak = int(seqLength * args.weak + 0.9)
+				print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
+				collect_reads(accessions, args.left_reads, args.right_reads, left_filt, right_filt, strong, weak, seqType)
 		print >> sys.stderr, "# Process finished", time.asctime()
 
 	# in kmer mode:
