@@ -196,8 +196,10 @@ def main(argv, wayout):
 	print >> sys.stderr, "Counted %d %s" % (kmercount, kmertag), time.asctime()
 	if maxcount:
 		print >> sys.stderr, "%d %s exceeded cutoffs" % (maxcount, kmertag), time.asctime()
-	if jfwroteback:
-		print >> sys.stderr, "Wrote %d kmers to %s" % (jfwroteback, args.jellyfish), time.asctime()
+	if not args.trinity and args.jellyfish:
+		if jfwroteback:
+			# only used in kmer counting mode
+			print >> sys.stderr, "Wrote %d kmers to %s" % (jfwroteback, args.jellyfish), time.asctime()
 
 if __name__ == "__main__":
 	main(sys.argv[1:],sys.stdout)
