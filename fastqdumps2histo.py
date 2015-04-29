@@ -48,15 +48,16 @@ this file can be imported directly into R for generating lava lamp plots
 
     for alternate usage in Trinity mode to count read coverage and GC
     use the intermediate output files (.stats) from kmersorter.py
-fastqdumps2histo.py -f *.fastq -s *.stats -k 100 -u 1000 -T - > histo.csv
+fastqdumps2histo.py -f *.fastq -s *.stats -u 1000 -T - > histo.csv
 
-    -k must be set to the read length, not the original kmer length
+    -r can set the read length, otherwise it is determined automatically
     -u is set as above
     -f are the original fastq reads (use wildcard or list multiple)
        this could also be a subset of the original reads
     -s are the .stats files for each read
     -t to specify fasta read files (-t fasta)
     -T - must set both -T for Trinity mode and - for null input
+    -k is unused for this step
 """
 
 import sys
@@ -69,6 +70,12 @@ def get_freq(line):
 
 def get_gc(kmer):
 	return kmer.count("G")+kmer.count("C")
+
+def stats_to_dict(statfile):
+	sd = {}
+	for line in open(statfile, 'r'):
+		add_cov_to_acc(line, sd)
+	return sd
 
 def add_cov_to_acc(line, statDict):
 	splits = line.split("\t")
@@ -112,6 +119,7 @@ def main(argv, wayout):
 	kmercount = 0
 	maxcount = 0
 	kmertag = "kmers"
+	verbose = False
 
 	if args.trinity:
 		# checking for matching stats and fastx files
@@ -126,17 +134,17 @@ def main(argv, wayout):
 			LC = 4
 		else: # otherwise args.type=="fasta"
 			LC = 2
-		# overwri
+		# overwrite if read length is given
 		if args.read_length:
 			seqLen = args.read_length
 		# generate kmer x maximum matrix, using kmer length as ymax
 		m = [[0 for x in range(args.upper+1)] for y in range(seqLen+1)]
+		if verbose:
+			print >> sys.stderr, "Generating matrix of %d by %d" % (len(m), len(m[0]) )
 		for statfile, fastxfile in izip(args.stats, args.fastx):
-			statDict = {}
 			print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
-			for line in open(statfile, 'r'):
-				add_cov_to_acc(line, statDict)
-			print >> sys.stderr, "Reading %s file %s" % (args.type, fastxfile), time.asctime()
+			statDict = stats_to_dict(statfile)
+			print >> sys.stderr, "Reading file %s" % (fastxfile), time.asctime()
 			linecount = 0
 			for line in open(fastxfile, 'r'):
 				linecount += 1
