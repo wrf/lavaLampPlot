@@ -48,9 +48,9 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
 
    `kmersorter.py -T -k 31 -m 20G -p 8 -a 100 -b 200 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
 
-5. Generate a more precise coverage to GC map using the entire read rather than kmers. This is run similarly as before with some alternate options in fastqdumps2histo. As above, Trinity mode is specified with `-T`. The intermediate stats files from kmersorter are then used with the raw reads to count the coverage and GC. The `-k` value here is the length of the reads, not the kmer length.
+5. Generate a more precise coverage to GC map using the entire read rather than kmers. This is run similarly as before with some alternate options in fastqdumps2histo. As above, Trinity mode is specified with `-T`. The intermediate stats files from kmersorter are then used with the raw reads to count the coverage and GC. The read length should be detected automatically, though can be specified with the `-r` option.
 
-   `fastqdumps2histo.py -s reads_1.stats reads_2.stats -f reads_1.fq reads_2.fq -k 100 -u 1000 -T - > reads.gc_cov.histo.csv`
+   `fastqdumps2histo.py -s reads_1.stats reads_2.stats -f reads_1.fq reads_2.fq -u 1000 -T - > reads.gc_cov.histo.csv`
 
 6. Run the R script on this .csv file as above.
 
