@@ -62,19 +62,26 @@ def check_gc(gc, strong, weak):
 def fastq_line_acc(line):
 	return line.rstrip().split(" ")[0][1:]
 
-def stats_to_dict(statfile):
+def stats_to_dict(statfile, above, below):
 	sd = {}
+	readCount, addCount = 0,0
 	for line in open(statfile, 'r'):
-		### TODO check coverage beforing adding to dict, this saves memory but is not faster
-		#splits = line.split("\t")
-		#medCov = int(splits[0])
-		#if below >= medCov >= above:
-		add_cov_to_acc(line, sd)
+		# in order to save memory, stats are filtered before adding to dictionary
+		readCount += 1
+		splits = line.split("\t")
+		medCov = int(splits[0])
+		if below >= medCov >= above:
+			add_cov_to_acc(line, sd)
+			addCount += 1
+	print >> sys.stderr, "Read %d stats and %d pass coverage" % (readCount, addCount), time.asctime()
 	return sd
 
-def check_cov(acc, statDict, above, below):
+def check_cov(acc, statDict):
+	# since stats should be either the coverage value or not in the dictionary
+	# freq can either take 0 or the coverage
 	freq = statDict.get(acc, 0)
-	return (below >= freq >= above)
+	# so the bool is either 1, passes coverage, or 0, not in dictionary
+	return bool(freq)
 
 def add_cov_to_acc(line, statDict):
 	splits = line.split("\t")
@@ -101,7 +108,7 @@ def collect_reads(statdict1, statdict2, reads1, reads2, left_filt, right_filt, a
 	pairCount, writePairs = 0, 0
 	lineCount, writeCount = 0, 0
 	keepPair, passGC = False, False
-	print >> sys.stderr, "Stats files contain %d and %d accessions" % (len(statdict1), len(statdict2) ), time.asctime()
+	print >> sys.stderr, "Stats contain %d and %d accessions" % (len(statdict1), len(statdict2) ), time.asctime()
 	with open(left_filt, 'w') as lf, open(right_filt, 'w') as rf:
 		for line1, line2 in izip( open(reads1,'r'), open(reads2,'r') ):
 			lineCount += 1
@@ -113,7 +120,7 @@ def collect_reads(statdict1, statdict2, reads1, reads2, left_filt, right_filt, a
 			if linenum == 2:
 				gc1, gc2 = get_gc(line1), get_gc(line2)
 				# if either read is in both the selected cov and gc, keep the pair
-				if (check_gc(gc1, strong, weak) and check_cov(fastq_line_acc(acc1), statdict1, above, below) ) or (check_gc(gc2, strong, weak) and check_cov(fastq_line_acc(acc2), statdict2, above, below) ):
+				if (check_gc(gc1, strong, weak) and check_cov(fastq_line_acc(acc1), statdict1) ) or (check_gc(gc2, strong, weak) and check_cov(fastq_line_acc(acc2), statdict2) ):
 					keepPair = True
 					# if writing, add to writePairs which should finally equal the length of the dictionary
 					writePairs += 1
@@ -294,9 +301,9 @@ def main(argv, wayout):
 				print >> sys.stderr, "# Filtering coverage between %d and %d" % (args.above, args.below), time.asctime()
 				print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
 				print >> sys.stderr, "# Reading stats file %s" % left_stats, time.asctime()
-				statDict1 = stats_to_dict(left_stats)
+				statDict1 = stats_to_dict(left_stats, args.above, args.below)
 				print >> sys.stderr, "# Reading stats file %s" % right_stats, time.asctime()
-				statDict2 = stats_to_dict(right_stats)
+				statDict2 = stats_to_dict(right_stats, args.above, args.below)
 				print >> sys.stderr, "### Retrieving reads", time.asctime()
 				left_filt = "%s.k%d%s.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, coverage_string, seqType)
 				right_filt = "%s.k%d%s.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, coverage_string, seqType)
