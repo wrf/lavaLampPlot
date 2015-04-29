@@ -20,10 +20,9 @@ jellyfish dump fastq.counts > fastq.counts.dumps
   # This is recommended to get better coverage slices if you have Trinity
   # these steps make use of various Trinity plugins and scripts
   4) run kmersorter with Trinity mode and all reads and the Trinity directory
-kmersorter.py -T -k 31 -m 20G -p 4 -a 100 -b 200 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.counts.dumps
+kmersorter.py -T -k 31 -p 4 -a 100 -b 200 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.counts.dumps
 
   use -k to specify kmer length used by jellyfish
-  use -m to specify the max memory usage for the `sort` command
   use -p to specify max number of threads for some parallel processes
   # the amount of memory needed may be around the size of the fastq dump file
   # this could easily be 20-50Gb, so use a high memory machine
@@ -63,35 +62,34 @@ def check_gc(gc, strong, weak):
 def fastq_line_acc(line):
 	return line.rstrip().split(" ")[0][1:]
 
-def filter_coverage(pairstats, above, below, keptAccs, stdCutoff):
-	# this part is a blatant rip off of Trinity's nbkc_normalize.pl script
-	total_lines = 0
-	nocovCount = 0
-	aberrant = 0
-	kept_count = 0
-	accessionDict = {}
-	with open(pairstats, 'r') as ps, open(keptAccs, 'w') as fa:
-		for line in ps:
-			total_lines += 1
-			medCov, avgCov, stdev, pctDev, acc = line.rstrip().split('\t')
-			medCov = int(medCov)
-			pctDev = int(pctDev)
-			if medCov < 1:
-				nocovCount +=1
-				continue
-			if pctDev >= stdCutoff:
-				aberrant += 1
-				continue
-			if below >= medCov >= above:
-				kept_count += 1
-				accessionDict[acc] = True
-				print >> fa, acc
-	print >> sys.stderr, "{} / {} = {:.2f} % reads kept after filtering".format(kept_count, total_lines, kept_count*100.0/total_lines )
-	print >> sys.stderr, "{} / {} = {:.2f} % reads with aberrant coverage profiles".format(aberrant, total_lines, aberrant*100.0/total_lines )
-	print >> sys.stderr, "{} / {} = {:.2f} % reads with no coverage".format(nocovCount, total_lines, nocovCount*100.0/total_lines )
-	return accessionDict
+def stats_to_dict(statfile):
+	sd = {}
+	for line in open(statfile, 'r'):
+		### TODO check coverage beforing adding to dict, this saves memory but is not faster
+		#splits = line.split("\t")
+		#medCov = int(splits[0])
+		#if below >= medCov >= above:
+		add_cov_to_acc(line, sd)
+	return sd
 
-def collect_reads(accessionDict, left, right, left_filt, right_filt, strong, weak, seqtype):
+def check_cov(acc, statDict, above, below):
+	freq = statDict.get(acc, 0)
+	return (below >= freq >= above)
+
+def add_cov_to_acc(line, statDict):
+	splits = line.split("\t")
+	# lines of stats file look like:
+	#12	17.6632	10.3014	58.3215	HISEQ:150:C5KTJANXX:4:1101:1469:1959/1	thread:5
+	# or this for SRA files:
+	#53	57.4143	16.8252	29.3049	SRR1032106.2000.1/H	thread:5
+	medCov = int(splits[0])
+	acc = splits[4].split("/")[0]
+	statDict[acc] = medCov
+	# nothing to return
+
+def collect_reads(statdict1, statdict2, reads1, reads2, left_filt, right_filt, above, below, strong, weak, seqtype):
+	# this part was formerly a blatant rip off of Trinity's nbkc_normalize.pl script
+	# script calculated read pair average coverages, which caused problems with read extraction
 	if seqtype == "fastq":
 		FH = "@"
 		LC = 4
@@ -102,26 +100,21 @@ def collect_reads(accessionDict, left, right, left_filt, right_filt, strong, wea
 	linenum = 0
 	pairCount, writePairs = 0, 0
 	lineCount, writeCount = 0, 0
-	covPassCount = 0
-	passCoverage, passGC = False, False
-	print >> sys.stderr, "Retained %d accessions" % (len(accessionDict) ), time.asctime()
+	keepPair, passGC = False, False
+	print >> sys.stderr, "Stats files contain %d and %d accessions" % (len(statdict1), len(statdict2) ), time.asctime()
 	with open(left_filt, 'w') as lf, open(right_filt, 'w') as rf:
-		for line1, line2 in izip( open(left,'r'), open(right,'r') ):
+		for line1, line2 in izip( open(reads1,'r'), open(reads2,'r') ):
 			lineCount += 1
 			linenum += 1
 			# check if this is the first line in the quartet, and that the first character is '@'
 			if linenum == 1 and line1[0] == FH:
 				pairCount += 1
 				acc1, acc2 = line1, line2
-				# if that acc is in the dictionary of reads to keep from the previous step
-				# it should return True, otherwise the default is False
-				passCoverage = accessionDict.get(fastq_line_acc(line1), False)
-				# this will either add 0 or 1 to covPassCount
-				covPassCount += int(passCoverage)
-			if passCoverage and linenum == 2:
+			if linenum == 2:
 				gc1, gc2 = get_gc(line1), get_gc(line2)
-				if check_gc(gc1, strong, weak) or check_gc(gc2, strong, weak):
-					passGC = True
+				# if either read is in both the selected cov and gc, keep the pair
+				if (check_gc(gc1, strong, weak) and check_cov(fastq_line_acc(acc1), statdict1, above, below) ) or (check_gc(gc2, strong, weak) and check_cov(fastq_line_acc(acc2), statdict2, above, below) ):
+					keepPair = True
 					# if writing, add to writePairs which should finally equal the length of the dictionary
 					writePairs += 1
 					writeCount += 1
@@ -129,17 +122,17 @@ def collect_reads(accessionDict, left, right, left_filt, right_filt, strong, wea
 					lf.write(acc1)
 					rf.write(acc2)
 					# then write the current line containing the sequence, and carry on
-			if passCoverage and passGC:
+			if keepPair:
 				writeCount += 1
 				lf.write(line1)
 				rf.write(line2)
 			# regardless if anything was written, reset linenum and passCoverage after 4 lines
 			if linenum == LC:
 				linenum = 0
-				passCoverage, passGC = False, False
+				keepPair, passGC = False, False
 	print >> sys.stderr, "Counted %d and wrote %d lines" % (lineCount, writeCount), time.asctime()
 	print >> sys.stderr, "Counted %d sequence pairs" % (pairCount), time.asctime()
-	print >> sys.stderr, "%d sequence pairs passed coverage, %d passed GC" % (covPassCount, writePairs), time.asctime()
+	print >> sys.stderr, "Kept %d read pairs" % (writePairs), time.asctime()
 
 def get_fastx_type(seqsFile):
 	with open(seqsFile, 'r') as lr:
@@ -175,7 +168,6 @@ def main(argv, wayout):
 	parser.add_argument('-T', '--trinity', action="store_true", help="use Trinity method to extract reads")
 	parser.add_argument('-D', '--directory', help="trinity directory")
 	parser.add_argument('-c', '--stdev-cutoff', type=int, metavar='N', default=200, help="upper limit for standard deviation cutoff [200]")
-	parser.add_argument('-m', '--memory', default="1G", help="memory usage maximum [1G]")
 	parser.add_argument('-p', '--processors', type=int, metavar='N', default=1, help="number of CPUs [1]")
 	parser.add_argument('-S', '--stats', action="store_false", help="only collect left and right stats in Trinity mode")
 	args = parser.parse_args(argv)
@@ -184,6 +176,20 @@ def main(argv, wayout):
 	keepgc = 0
 	kmercount = 0
 	freqsum = 0
+
+	# checks for normal data
+	with open(args.input_file,'r') as kf:
+		headerType = kf.readline()[0]
+		if not headerType == ">":
+			print >> sys.stderr, "# ERROR kmers not in fasta format"
+			print >> sys.stderr, "# Exiting", time.asctime()
+			sys.exit()
+		kmerlength = len(kf.readline().rstrip())
+		if not kmerlength == args.kmer:
+			print >> sys.stderr, "# ERROR kmer length %d incorrect for file %s" % (args.kmer, args.input_file)
+			print >> sys.stderr, "# kmer length appears to be %d, set this with -k" % (kmerlength )
+			print >> sys.stderr, "# Exiting", time.asctime()
+			sys.exit()
 
 	if args.strong > 1 or args.weak > 1:
 		print >> sys.stderr, "# ERROR -s and -w must be a float between 0.0 and 1.0"
@@ -204,9 +210,8 @@ def main(argv, wayout):
 		print >> sys.stderr, "### Checking for sub programs", time.asctime()
 		fastool_path = os.path.join(trinity_dir, "trinity-plugins/fastool/fastool")
 		kmertocov_path = os.path.join(trinity_dir, "Inchworm/bin/fastaToKmerCoverageStats")
-		mergeLR_path = os.path.join(trinity_dir, "util/support_scripts/nbkc_merge_left_right_stats.pl")
 		allProgsFound = True
-		for prog in [fastool_path, kmertocov_path, mergeLR_path]:
+		for prog in [fastool_path, kmertocov_path]:
 			if not os.path.isfile(prog):
 				print >> sys.stderr, "# Cannot find program %s" % (prog), time.asctime()
 				allProgsFound = False
@@ -274,57 +279,28 @@ def main(argv, wayout):
 		if args.stats:
 			if args.above==1 and args.below==10000 and args.strong==0.0 and args.weak==1.0:
 				print >> sys.stderr, "# No cutoffs specified, -a -b -s -w", time.asctime()
-				print >> sys.stderr, "# Exiting", time.asctime()
-				sys.exit()
 			else:
-				# the value of this step is in question
-				print >> sys.stderr, "### Sorting stats by read name", time.asctime()
-				left_sorted = "%s.sort" % left_stats
-				right_sorted = "%s.sort" % right_stats
-				if os.path.isfile(left_sorted) and os.path.isfile(right_sorted):
-					print >> sys.stderr, "# Stats already sorted, skipping...", time.asctime()
-				else:
-					print >> sys.stderr, "# Sorting left stats:", left_stats, time.asctime()
-					sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, left_stats]
-					with open(left_sorted, 'w') as lo:
-						subprocess.call(sort_args, stdout=lo)
-					print >> sys.stderr, "# Sorting right stats:", right_stats, time.asctime()
-					sort_args = ["/usr/bin/sort","--parallel=%d" % args.processors, "-k5,5", "-T", ".", "-S", args.memory, right_stats]
-					with open(right_sorted, 'w') as ro:
-						subprocess.call(sort_args, stdout=ro)
-
-				print >> sys.stderr, "### Merging left and right stats", time.asctime()
-				# this merging takes the average of the left and right, rounding up
-				paired_stats = "%s_pairs.k%d.stats" % (args.left_reads.split("_")[0], args.kmer)
-				if os.path.isfile(paired_stats):
-					print >> sys.stderr, "# Stats already merged, skipping...", time.asctime()
-				else:
-					mergeLR_args = ["perl", mergeLR_path, "--left", left_sorted, "--right", right_sorted, "--sorted"]
-					with open(paired_stats, 'w') as ps:
-						subprocess.call(mergeLR_args, stdout=ps)
-					print >> sys.stderr, "# Done merging", time.asctime()
-
 				print >> sys.stderr, "### Sorting read pairs by coverage", time.asctime()
-				print >> sys.stderr, "# Filtering coverage between %d and %d" % (args.above, args.below), time.asctime()
+				# this is a list of an empty string so that it can be string-joined later
 				coverage_mods = ['']
 				if not args.above==1 or not args.below==10000:
 					coverage_mods.append("a%d.b%d" % (args.above,args.below) )
+				# set GC limits, int is needed in case read length is not 100
 				strong = int(seqLength * args.strong + 0.9)
 				weak = int(seqLength * args.weak + 0.9)
 				if not args.strong==0.0 or not args.weak==1.0:
 					coverage_mods.append("s%d.w%d" % (strong,weak) )
 				coverage_string = ".".join(coverage_mods)
-				core_accs = "%s.k%d%s.sd%d.accs" % (paired_stats, args.kmer, coverage_string, args.stdev_cutoff)
-				accessions = filter_coverage(paired_stats, args.above, args.below, core_accs, args.stdev_cutoff)
-				print >> sys.stderr, "# Done filtering", time.asctime()
-				print >> sys.stderr, "### Retrieving reads", time.asctime()
-				left_filt = "%s.k%d%s.sd%d.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, coverage_string, args.stdev_cutoff, seqType)
-				right_filt = "%s.k%d%s.sd%d.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, coverage_string, args.stdev_cutoff, seqType)
-				# set GC limits, int is needed in case read length is not 100
-				strong = int(seqLength * args.strong + 0.9)
-				weak = int(seqLength * args.weak + 0.9)
+				print >> sys.stderr, "# Filtering coverage between %d and %d" % (args.above, args.below), time.asctime()
 				print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
-				collect_reads(accessions, args.left_reads, args.right_reads, left_filt, right_filt, strong, weak, seqType)
+				print >> sys.stderr, "# Reading stats file %s" % left_stats, time.asctime()
+				statDict1 = stats_to_dict(left_stats)
+				print >> sys.stderr, "# Reading stats file %s" % right_stats, time.asctime()
+				statDict2 = stats_to_dict(right_stats)
+				print >> sys.stderr, "### Retrieving reads", time.asctime()
+				left_filt = "%s.k%d%s.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, coverage_string, seqType)
+				right_filt = "%s.k%d%s.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, coverage_string, seqType)
+				collect_reads(statDict1, statDict2, args.left_reads, args.right_reads, left_filt, right_filt, args.above, args.below, strong, weak, seqType)
 		print >> sys.stderr, "# Process finished", time.asctime()
 
 	# in kmer mode:
