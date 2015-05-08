@@ -44,15 +44,21 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
 
    `jellyfish dump fastq.counts > fastq.dumps`
 
-   Then `-T` (Trinity mode) is called with kmersorter. This generates a table of median coverage per read, which would be used in Trinity to randomly normalize the data based on coverage. Instead, here it uses the same method to deterministically keep reads with coverage above or below some specified value (`-a` and `-b`, respectively). Specify the kmer used with `-k`. The Trinity base directory is given with `-D`. Some of the subprocesses can use multithreads, which is specified by `-p`. The sorting step requires a memory limit, which is `-m`; note that the most memory intensive step, fastaToKmerCoverageStats, may exceed this limit as it reads the entire fastq.dumps file into memory.
+   Then `-T` (Trinity mode) is called with kmersorter. This generates a table of median coverage per read, which would be used in Trinity to randomly normalize the data based on coverage. Instead, here it uses the same method to deterministically keep reads with coverage above or below some specified value (`-a` and `-b`, respectively). Specify the kmer used with `-k`. The Trinity base directory is given with `-D`. Some of the subprocesses can use multithreads, which is specified by `-p`. Note that the most memory intensive step, fastaToKmerCoverageStats, has no intrinsic memory limit as it reads the entire fastq.dumps file into memory; this is why the reduced dump is generated with the `-j` option in step 2.
 
-   `kmersorter.py -T -k 31 -m 20G -p 8 -a 100 -b 200 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
+   `kmersorter.py -T -k 31 -p 8 -a 100 -b 200 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
 
 5. Generate a more precise coverage to GC map using the entire read rather than kmers. This is run similarly as before with some alternate options in fastqdumps2histo. As above, Trinity mode is specified with `-T`. The intermediate stats files from kmersorter are then used with the raw reads to count the coverage and GC. The read length should be detected automatically, though can be specified with the `-r` option.
 
    `fastqdumps2histo.py -s reads_1.stats reads_2.stats -f reads_1.fq reads_2.fq -u 1000 -T - > reads.gc_cov.histo.csv`
 
 6. Run the R script on this .csv file as above.
+
+7. With the stats files already generated from step 5, cut out sections of reads from the plot by running kmersorter again with different options. Use `-s` and `-w` to set the lower and upper bounds of GC percent cutoff. For example:
+
+   `kmersorter.py -T -k 31 -p 8 -a 50 -b 100 -s 0.5 -w 0.7 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
+   
+   `kmersorter.py -T -k 31 -p 8 -a 45 -b 80 -s 0.35 -w 0.45 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
 
 ## Usage considerations
 #### Choosing k-mer length
