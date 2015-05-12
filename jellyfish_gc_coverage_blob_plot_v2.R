@@ -1,5 +1,5 @@
 # plot jellyfish kmer coverage vs gc content in lava lamp form
-# v2 last modified 2015-04-02
+# v2 last modified 2015-05-12
 
 # this script was generated using R version 3.1.3
 # generate csv matrix of outputs using fastqdumps2histo.py
@@ -12,7 +12,11 @@ f1 = "~/genomes/hydra_vulgaris/hydra_vulgaris_SRR1032106.k31.gc_vs_cov.csv"
 
 ### RENAME THIS TO THE DESIRED OUTPUT PDF
 # change this for the output pdf, note that the pdf extension may be required
-outfilename = "~/genomes/hydra_vulgaris/hydra_vulgaris_k31_vs_gc_with_line.pdf"
+outfilename = "~/genomes/hydra_vulgaris/hydra_vulgaris_k31_vs_gc_with_scale.pdf"
+
+### SET THESE PARAMETERS BASED ON DESIRED OUTPUT
+withscale  = TRUE
+withline   = FALSE
 
 ### CHANGE THIS VALUE BASED ON JELLYFISH -U OPTION
 # or to subset or make the matrix smaller, change ymax, say to view from 0 to 500
@@ -52,17 +56,26 @@ m2 = log(m1, base=2)
 # first function generates color scale of 1000 colors from white to purple, then purple to red
 colorcount = 1000
 # 10 percent of the colors are for white to pink, the rest through the rainbow
-white2pink = colorcount*0.1
-pink2red = colorcount*0.9
-colorset = c(colorRampPalette(c("#FFFFFF","#FF00FF"),alpha=0.9)(white2pink), rainbow(pink2red, start=0.93, end=0.91, v=0.8, alpha=0.9) )
+white2pink = colorcount*0.166
+pink2red = colorcount*0.834
+colorset = c(colorRampPalette(c("#FFFFFF","#CC006E"),alpha=0.9)(white2pink), rainbow(pink2red, start=0.91, end=0.89, v=0.8, alpha=0.9) )
 
 # for coverage heatmap
 ### MUST UNCOMMENT FOR PDF OUTPUT
 pdf(file=outfilename, width=10, heigh=8)
 
-par(mar=c(4,4,4,4))
 # this becomes the main chart label
 mainlab = paste(kmer,"mer coverage vs GC",sep="")
+
+if(withscale==TRUE){
+	# this generates a 2 column figure with a narrow scalebar on the right side
+	layout(matrix(c(1,2),1,2), widths=c(9,1))
+	par(mar=c(4,4,4,2))	
+}else{
+	# this explicit sets up the single panel figure
+	layout(matrix(c(1,1),1,1), widths=c(1))
+	par(mar=c(4,4,4,4))
+}
 # image() actually generates the heatmap
 image(x=1:ncol(m2), y=1:nrow(m2), z=t(m2), col=colorset, xlab="Coverage", ylab="GC%", axes=FALSE, main=mainlab )
 axis(1, at=pretty(c(0,ymax)), labels=pretty(c(0,ymax)) )
@@ -75,18 +88,31 @@ textsize = 1.3
 # add one text command for each comment, such as identity of each blob
 # x axis positions center at the given value, so must be increased for left alignment
 # y axis positions correspond to GC counts, not percentage
+# so they can be converted to values with percent GC x kmer
 ### UNCOMMENT TO DISPLAY TEXT OVERLAY OR MODIFY
-#text(160,9,"Hydra genomic", col=textcol, cex=textsize)
-#text(125,24,"Curvibacter", col=textcol, cex=textsize)
+#text(160,0.29*kmer,"Hydra genomic", col=textcol, cex=textsize)
+#text(125,0.77*kmer,"Curvibacter", col=textcol, cex=textsize)
 
 # for line overlay
-### COMMENT OUT LINES FROM PAR THROUGH PLOT TO REMOVE LINE OVERLAY
-par(new=TRUE, mar=c(4,2,2,2))
-# parameters for line generation
-xmax2 = length(d2)
-ymax2 = max(d2)
-yscale = ceiling(log(ymax2,base=10))
-plot(d2, type='l', xlab="Coverage", ylab="Unique kmers", xlim=c(0,xmax2), ylim=c(10^2,10^yscale), log='y', frame.plot=FALSE, axes=FALSE)
+if (withline==TRUE){
+	par(new=TRUE, mar=c(4,2,2,2))
+	# parameters for line generation
+	xmax2 = length(d2)
+	ymax2 = max(d2)
+	yscale = ceiling(log(ymax2,base=10))
+	plot(d2, type='l', xlab="Coverage", ylab="Unique kmers", xlim=c(0,xmax2), ylim=c(10^2,10^yscale), log='y', frame.plot=FALSE, axes=FALSE)
+}
+# for log scalebar
+if (withscale==TRUE){
+	par(new=FALSE, mar=c(4,2,2,1))
+	l2zmax = log(zmax, base=2)
+	notch = log(10^seq(0,10), base=2)
+	mnotch = notch[notch<=l2zmax]
+	mnotchpos = mnotch/l2zmax
+	colorbar = as.matrix(seq(0,l2zmax,ceiling(l2zmax)/colorcount),1,colorcount+1)
+	image(z=t(colorbar),col=colorset, axes=FALSE, xlab="Counts")
+	axis(2,at=mnotchpos, labels=c(round(2^mnotch)), las=1)
+}
 
 ### MUST UNCOMMENT FOR PDF OUTPUT
 dev.off()
