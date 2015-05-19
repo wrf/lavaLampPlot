@@ -1,5 +1,5 @@
 # plot jellyfish kmer coverage vs gc content in lava lamp form
-# v2 last modified 2015-05-12
+# v2 last modified 2015-05-19
 
 # this script was generated using R version 3.1.3
 # generate csv matrix of outputs using fastqdumps2histo.py
@@ -15,8 +15,16 @@ f1 = "~/genomes/hydra_vulgaris/hydra_vulgaris_SRR1032106.k31.gc_vs_cov.csv"
 outfilename = "~/genomes/hydra_vulgaris/hydra_vulgaris_k31_vs_gc_with_scale.pdf"
 
 ### SET THESE PARAMETERS BASED ON DESIRED OUTPUT
+# withscale draws a scalebar to the right, withline means draw the log line overlay
 withscale  = TRUE
 withline   = FALSE
+
+refinecolors = TRUE
+# if refinecolors is true, it will assume that the value set as zmax below (default to 1M) should be purple
+# and the max in the graph should adjust to that; if that max is below zmax, the highest color changes
+# this means that colors would be comparable across different samples, rather than just the scale values
+
+# if refinecolors is false, purple will always be the highest value, regardless of the set zmax
 
 ### CHANGE THIS VALUE BASED ON JELLYFISH -U OPTION
 # or to subset or make the matrix smaller, change ymax, say to view from 0 to 500
@@ -49,6 +57,7 @@ d2 = colSums(m1)
 
 # chops all values greater than zmax to zmax, which is 1 million by default
 m1[m1>zmax] = zmax
+
 # log all values to get better color resolution
 m2 = log(m1, base=2)
 
@@ -59,6 +68,15 @@ colorcount = 1000
 white2pink = colorcount*0.166
 pink2red = colorcount*0.834
 colorset = c(colorRampPalette(c("#FFFFFF","#CC006E"),alpha=0.9)(white2pink), rainbow(pink2red, start=0.91, end=0.89, v=0.8, alpha=0.9) )
+
+# zmax should therefore be either the max of m1 or the defined zmax, whichever is lower
+truezmax = min(max(m1),zmax)
+if (refinecolors==TRUE){
+# colorset is then bound by the truezmax, so the highest color value will be constant across 
+	colorset = colorset[1:as.integer(log(truezmax, base=2)/log(zmax, base=2)*1000)]
+}
+# must recalculate zmax if zmax is much greater than highest value in m1, otherwise colors are wrong
+zmax = truezmax
 
 # for coverage heatmap
 ### MUST UNCOMMENT FOR PDF OUTPUT
