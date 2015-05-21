@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 #
-# fastqdumps2histo.py v1.2 last modified 2015-04-23
+# fastqdumps2histo.py v1.2 last modified 2015-05-21
 # by WRF
 
 """
-fastqdumps2histo.py v1.2 2015-04-23
+fastqdumps2histo.py v1.2 2015-05-21
 
     first generate fastq.counts file from zipped reads with jellyfish count
 gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G /dev/fd/0
@@ -78,13 +78,14 @@ def stats_to_dict(statfile):
 	return sd
 
 def add_cov_to_acc(line, statDict):
-	splits = line.split("\t")
+	lsplits = line.split("\t")
 	# lines of stats file look like:
 	#12	17.6632	10.3014	58.3215	HISEQ:150:C5KTJANXX:4:1101:1469:1959/1	thread:5
 	# or this for SRA files:
 	#53	57.4143	16.8252	29.3049	SRR1032106.2000.1/H	thread:5
-	medCov = int(splits[0])
-	acc = splits[4].split("/")[0]
+	medCov = int(lsplits[0])
+	acc = lsplits[4].split(" ")[0]
+	# was previously using split("/")[0], caused errors with different split in fastx_line_acc
 	statDict[acc] = medCov
 	# nothing to return
 
@@ -112,6 +113,7 @@ def main(argv, wayout):
 	parser.add_argument('-t', '--type', help="sequence type, fasta, fastq or [auto-detect]")
 	parser.add_argument('-T', '--trinity', action="store_true", help="use Trinity method to extract reads")
 	parser.add_argument('-u', '--upper', type=int, metavar='N', default=1000, help="upper limit for histogram [1000]")
+	parser.add_argument('-v', '--verbose', action="store_true", help="extra output for debugging")
 	args = parser.parse_args(argv)
 
 	# gc and freq are set by default to 0, in case the reads cannot be parsed
@@ -144,6 +146,9 @@ def main(argv, wayout):
 		for statfile, fastxfile in izip(args.stats, args.fastx):
 			print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
 			statDict = stats_to_dict(statfile)
+			print >> sys.stderr, "Found stats for %d sequences" % len(statDict), time.asctime()
+			if args.verbose:
+				print >> sys.stderr, "Stats stored as: {}".format(statDict.iterkeys().next())
 			print >> sys.stderr, "Reading file %s" % (fastxfile), time.asctime()
 			linecount = 0
 			for line in open(fastxfile, 'r'):
@@ -167,6 +172,10 @@ def main(argv, wayout):
 						# possibly wrong data type, no point continuing
 						sys.exit()
 					linecount = 0
+			if args.verbose:
+				print >> sys.stderr, "Sequence headers as: {}".format(acc)
+			if sum(x[0] for x in m)==kmercount:
+				print >> sys.stderr, "ERROR No stats found for reads", time.asctime()
 		kmertag = "reads"
 	else:
 		if args.jellyfish:
