@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 #
-# fastqdumps2histo.py v1.2 last modified 2015-05-21
+# fastqdumps2histo.py v1.3 last modified 2015-05-25
 # by WRF
 
 """
-fastqdumps2histo.py v1.2 2015-05-21
+fastqdumps2histo.py v1.3 2015-05-25
 
     first generate fastq.counts file from zipped reads with jellyfish count
 gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G /dev/fd/0
@@ -28,7 +28,7 @@ jellyfish dump fastq.counts | fastqdumps2histo.py - > histo.csv
 
 jellyfish dump fastq.counts | fastqdumps2histo.py -j fastq.dumps - > histo.csv
 
-    otherwise use as input file
+    otherwise use directly as an input file
 fastqdumps2histo.py fastq.dumps > histo.csv
 
     if using a different kmer (other than 25, the default)
@@ -58,6 +58,10 @@ fastqdumps2histo.py -f *.fastq -s *.stats -u 1000 -T - > histo.csv
     -t to specify fasta read files (-t fasta)
     -T - must set both -T for Trinity mode and - for null input
     -k is unused for this step
+
+    for Trinity mode with long reads (such as sanger ESTs)
+    use the -p option to calculate GC as percentage rather than raw count
+fastqdumps2histo.py -f reads.fasta -s reads.stats -u 1000 -T -p - > histo.csv
 """
 
 import sys
@@ -70,6 +74,9 @@ def get_freq(line):
 
 def get_gc(kmer):
 	return kmer.count("G")+kmer.count("C")
+
+def get_gc_perc_int(kmer):
+	return (kmer.count("G")+kmer.count("C"))*100/len(kmer.rstrip())
 
 def stats_to_dict(statfile):
 	sd = {}
@@ -92,11 +99,41 @@ def add_cov_to_acc(line, statDict):
 def fastx_line_acc(line):
 	return line.rstrip().split(" ")[0][1:]
 
-def get_fastx_type(seqsFile):
+def get_fastx_type(seqsFile, verbose):
 	with open(seqsFile, 'r') as lr:
-		headerType = lr.readline()[0]
+		headerLine = lr.readline()
+		headerType = headerLine[0]
 		seqLength = len(lr.readline().rstrip())
+		if verbose:
+			print >> sys.stderr, "Sequence header in format of: {}".format(headerLine.rstrip())
+			print >> sys.stderr, "Header starts with: {}".format(headerType)
 	return headerType, seqLength
+
+def count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, gcfunction):
+	linecount = 0
+	for line in open(fastxfile, 'r'):
+		linecount += 1
+		if linecount==1 and line[0]==FH:
+			kmercount += 1
+			acc = fastx_line_acc(line)
+			freq = statDict.get(acc, 0)
+		elif linecount==2:
+			gc = gcfunction(line)
+		# if it is the last line of each sequence, so cannot be elif
+		if linecount==LC:
+			# use try except in case the wrong -u is used or files were merged
+			try:
+				m[gc][freq] += 1
+			except IndexError:
+				# most likely reason for this is setting -k to kmer rather than read length
+				maxcount += 1
+			except UnboundLocalError:
+				# this happened when freq was called before assignment
+				print >> sys.stderr, "ERROR Check data type", time.asctime()
+				# possibly wrong data type, no point continuing
+				sys.exit()
+			linecount = 0
+	return m, kmercount, maxcount
 
 def main(argv, wayout):
 	if not len(argv):
@@ -108,6 +145,7 @@ def main(argv, wayout):
 	parser.add_argument('-j', '--jellyfish', help="optional file for the filtered jellyfish dump")
 	parser.add_argument('-k', '--kmer', type=int, metavar='N', default=25, help="kmer length [25]")
 	parser.add_argument('-l', '--lower', type=int, metavar='N', default=2, help="lower limit for optional jellyfish dump [2]")
+	parser.add_argument('-p', '--percentage', action="store_true", help="count GC as percentage for long reads, not by fixed read length (ignores -r)")
 	parser.add_argument('-r', '--read-length', type=int, metavar='N', help="read length for Trinity mode [auto-detect]")
 	parser.add_argument('-s', '--stats', nargs='*', help="Trinity stats files")
 	parser.add_argument('-t', '--type', help="sequence type, fasta, fastq or [auto-detect]")
@@ -121,7 +159,6 @@ def main(argv, wayout):
 	kmercount = 0
 	maxcount = 0
 	kmertag = "kmers"
-	verbose = False
 
 	if args.trinity:
 		# checking for matching stats and fastx files
@@ -130,7 +167,7 @@ def main(argv, wayout):
 			print >> sys.stderr, "Exiting", time.asctime()
 			sys.exit()
 		# autodetect length and header type from fastx files
-		FH, seqLen = get_fastx_type(args.fastx[0])
+		FH, seqLen = get_fastx_type(args.fastx[0], args.verbose)
 		# checking for sequence type and getting basic parameters of sequence parsing
 		if (FH=="@" or args.type=="fastq"):
 			LC = 4
@@ -139,41 +176,29 @@ def main(argv, wayout):
 		# overwrite if read length is given
 		if args.read_length:
 			seqLen = args.read_length
-		# generate kmer x maximum matrix, using kmer length as ymax
-		m = [[0 for x in range(args.upper+1)] for y in range(seqLen+1)]
-		if verbose:
+
+		# set up different matrix if using percentage counting
+		if args.percentage:
+			# generate a matrix of 0 to 100 x cov maximum
+			m = [[0 for x in range(args.upper+1)] for y in range(101)]
+		else:
+			# generate read length x cov maximum matrix, using read length as ymax
+			m = [[0 for x in range(args.upper+1)] for y in range(seqLen+1)]
+		if args.verbose:
 			print >> sys.stderr, "Generating matrix of %d by %d" % (len(m), len(m[0]) )
+
+		# iterate over pairs of fastx and stats files
 		for statfile, fastxfile in izip(args.stats, args.fastx):
 			print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
 			statDict = stats_to_dict(statfile)
 			print >> sys.stderr, "Found stats for %d sequences" % len(statDict), time.asctime()
 			if args.verbose:
-				print >> sys.stderr, "Stats stored as: {}".format(statDict.iterkeys().next())
+				print >> sys.stderr, "Stats stored in format of: {}".format(statDict.iterkeys().next())
 			print >> sys.stderr, "Reading file %s" % (fastxfile), time.asctime()
-			linecount = 0
-			for line in open(fastxfile, 'r'):
-				linecount += 1
-				if linecount==1 and line[0]==FH:
-					kmercount += 1
-					acc = fastx_line_acc(line)
-					freq = statDict.get(acc, 0)
-				if linecount==2:
-					gc = get_gc(line)
-				if linecount==LC:
-					# use try except in case the wrong -u is used or files were merged
-					try:
-						m[gc][freq] += 1
-					except IndexError:
-						# most likely reason for this is setting -k to kmer rather than read length
-						maxcount += 1
-					except UnboundLocalError:
-						# this happened when freq was called before assignment
-						print >> sys.stderr, "ERROR Check data type", time.asctime()
-						# possibly wrong data type, no point continuing
-						sys.exit()
-					linecount = 0
-			if args.verbose:
-				print >> sys.stderr, "Sequence headers as: {}".format(acc)
+			if args.percentage:
+				m, kmercount, maxcount = count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, get_gc_perc_int)
+			else:
+				m, kmercount, maxcount = count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, get_gc)
 			if sum(x[0] for x in m)==kmercount:
 				print >> sys.stderr, "ERROR No stats found for reads", time.asctime()
 		kmertag = "reads"

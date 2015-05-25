@@ -94,15 +94,19 @@ def add_cov_to_acc(line, statDict):
 	statDict[acc] = medCov
 	# nothing to return
 
+def get_header_from_seqtype(seqtype):
+	# returns two part header to correspond to FH and LC
+	# one for the symbol of the fastx header
+	# one for the number of lines per read
+	if seqtype == "fastq":
+		return "@", 4
+	else:
+		return ">", 2
+
 def collect_reads(statdict1, statdict2, reads1, reads2, left_filt, right_filt, above, below, strong, weak, seqtype):
 	# this part was formerly a blatant rip off of Trinity's nbkc_normalize.pl script
 	# script calculated read pair average coverages, which caused problems with read extraction
-	if seqtype == "fastq":
-		FH = "@"
-		LC = 4
-	else:
-		FH = ">"
-		LC = 2
+	FH, LC = get_header_from_seqtype(seqtype)
 	# linenum should have values only of 0 through LC (which is normally 4)
 	linenum = 0
 	pairCount, writePairs = 0, 0
@@ -141,6 +145,45 @@ def collect_reads(statdict1, statdict2, reads1, reads2, left_filt, right_filt, a
 	print >> sys.stderr, "Counted %d sequence pairs" % (pairCount), time.asctime()
 	print >> sys.stderr, "Kept %d read pairs" % (writePairs), time.asctime()
 
+def collect_unpaired(statdict1, reads1, left_filt, above, below, strong, weak, seqtype):
+	# this is to collect unpaired reads, perhaps sanger sequences or singletons
+	# this assumes reads are long, and strong and weak should be percentages
+	FH, LC = get_header_from_seqtype(seqtype)
+	linenum = 0
+	readCount, writeReads = 0, 0
+	lineCount, writeCount = 0, 0
+	keepSeq, passGC = False, False
+	print >> sys.stderr, "Stats contain %d accessions" % (len(statdict1)), time.asctime()
+	with open(left_filt, 'w') as lf:
+		for line1 in open(reads1,'r'):
+			lineCount += 1
+			linenum += 1
+			# check if this is the first line in the quartet, and that the first character is '@'
+			if linenum == 1 and line1[0] == FH:
+				readCount += 1
+				acc1= line1
+			if linenum == 2:
+				gc1 = float(get_gc(line1))/len(line1.rstrip()) # should be a float between 0 and 1
+				# if the read is in both the selected cov and gc, keep the pair
+				if (check_gc(gc1, strong, weak) and check_cov(fastq_line_acc(acc1), statdict1) ):
+					keepSeq = True
+					# if writing, add to writeReads
+					writeReads += 1
+					writeCount += 1
+					# write the previous line and add 1 to the count if it passes
+					lf.write(acc1)
+					# then write the current line containing the sequence, and carry on
+			if keepSeq:
+				writeCount += 1
+				lf.write(line1)
+			# regardless if anything was written, reset linenum and passCoverage after 4 lines
+			if linenum == LC:
+				linenum = 0
+				keepSeq, passGC = False, False
+	print >> sys.stderr, "Counted %d and wrote %d lines" % (lineCount, writeCount), time.asctime()
+	print >> sys.stderr, "Counted %d sequence seqs" % (readCount), time.asctime()
+	print >> sys.stderr, "Kept %d reads" % (writeReads), time.asctime()
+
 def get_fastx_type(seqsFile):
 	with open(seqsFile, 'r') as lr:
 		header = lr.readline()[0]
@@ -173,6 +216,7 @@ def main(argv, wayout):
 	parser.add_argument('-1', '--left-reads', help="fastq reads 1 of a pair")
 	parser.add_argument('-2', '--right-reads', help="fastq reads 2 of a pair")
 	parser.add_argument('-T', '--trinity', action="store_true", help="use Trinity method to extract reads")
+	parser.add_argument('-L', '--long-reads', action="store_true", help="files are long reads to be counted separately")
 	parser.add_argument('-D', '--directory', help="trinity directory")
 	parser.add_argument('-c', '--stdev-cutoff', type=int, metavar='N', default=200, help="upper limit for standard deviation cutoff [200]")
 	parser.add_argument('-p', '--processors', type=int, metavar='N', default=1, help="number of CPUs [1]")
@@ -198,10 +242,16 @@ def main(argv, wayout):
 			print >> sys.stderr, "# Exiting", time.asctime()
 			sys.exit()
 
+	# check that strong and weak are either floats between 0 and 1, or integers
 	if args.strong > 1 or args.weak > 1:
-		print >> sys.stderr, "# ERROR -s and -w must be a float between 0.0 and 1.0"
-		print >> sys.stderr, "# Exiting", time.asctime()
-		sys.exit()
+		if args.long_reads:
+			print >> sys.stderr, "# ERROR for long reads -L, -s and -w must be a float between 0.0 and 1.0"
+			print >> sys.stderr, "# Exiting", time.asctime()
+			sys.exit()
+		if int(args.strong)!=args.strong or int(args.weak)!=args.weak:
+			print >> sys.stderr, "# ERROR -s and -w must be a float between 0.0 and 1.0 or integers of raw GC counts"
+			print >> sys.stderr, "# Exiting", time.asctime()
+			sys.exit()
 
 	if args.trinity:
 		print >> sys.stderr, "### Running Trinity type read sorting", time.asctime()
@@ -212,7 +262,9 @@ def main(argv, wayout):
 			print >> sys.stderr, "# Must provide a valid directory -D", time.asctime()
 			print >> sys.stderr, "# Exiting", time.asctime()
 			sys.exit()
-
+		#
+		if args.long_reads:
+			print >> sys.stderr, "# Treating reads as separate long-read files", time.asctime()
 		# check if all programs are there
 		print >> sys.stderr, "### Checking for sub programs", time.asctime()
 		fastool_path = os.path.join(trinity_dir, "trinity-plugins/fastool/fastool")
@@ -232,7 +284,8 @@ def main(argv, wayout):
 		if os.path.isfile(args.left_reads) and os.path.isfile(args.right_reads):
 			print >> sys.stderr, "# Reads found... OK"
 			headerType, seqLength = get_fastx_type(args.left_reads)
-			print >> sys.stderr, "# Detected read length of %d... OK" % (seqLength)
+			if not args.long_reads:
+				print >> sys.stderr, "# Detected read length of %d... OK" % (seqLength)
 			if args.type=="auto":
 				seqType = fastx_header_to_type(headerType)
 				print >> sys.stderr, "# Detected seq type %s... OK" % (seqType)
@@ -292,14 +345,27 @@ def main(argv, wayout):
 				coverage_mods = ['']
 				if not args.above==1 or not args.below==10000:
 					coverage_mods.append("a%d.b%d" % (args.above,args.below) )
-				# set GC limits, int is needed in case read length is not 100
-				strong = int(seqLength * args.strong + 0.9)
-				weak = int(seqLength * args.weak + 0.9)
-				if not args.strong==0.0 or not args.weak==1.0:
-					coverage_mods.append("s%d.w%d" % (strong,weak) )
-				coverage_string = ".".join(coverage_mods)
 				print >> sys.stderr, "# Filtering coverage between %d and %d" % (args.above, args.below), time.asctime()
-				print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
+				# set GC limits, int is needed in case read length is not 100
+				if (int(args.strong)==args.strong and int(args.weak)==args.weak):
+					strong, weak = args.strong, args.weak
+					print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
+				else:
+					if args.long_reads:
+						strong, weak = args.strong, args.weak
+						print >> sys.stderr, "# Filtering GC between %.3f and %.3f" % (strong, weak), time.asctime()
+					else:
+						strong = int(seqLength * args.strong + 0.9)
+						weak = int(seqLength * args.weak + 0.9)
+						print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
+				if not args.strong==0.0 or not args.weak==1.0:
+					if args.long_reads:
+						coverage_mods.append("s%d.w%d" % (strong*100,weak*100) )
+					else:
+						coverage_mods.append("s%d.w%d" % (strong,weak) )
+
+				# generate output file names
+				coverage_string = ".".join(coverage_mods)
 				print >> sys.stderr, "# Reading stats file %s" % left_stats, time.asctime()
 				statDict1 = stats_to_dict(left_stats, args.above, args.below)
 				print >> sys.stderr, "# Reading stats file %s" % right_stats, time.asctime()
@@ -307,7 +373,11 @@ def main(argv, wayout):
 				print >> sys.stderr, "### Retrieving reads", time.asctime()
 				left_filt = "%s.k%d%s.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, coverage_string, seqType)
 				right_filt = "%s.k%d%s.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, coverage_string, seqType)
-				collect_reads(statDict1, statDict2, args.left_reads, args.right_reads, left_filt, right_filt, args.above, args.below, strong, weak, seqType)
+				if args.long_reads:
+					collect_unpaired(statDict1, args.left_reads, left_filt, args.above, args.below, strong, weak, seqType)
+					collect_unpaired(statDict2, args.right_reads, right_filt, args.above, args.below, strong, weak, seqType)
+				else:
+					collect_reads(statDict1, statDict2, args.left_reads, args.right_reads, left_filt, right_filt, args.above, args.below, strong, weak, seqType)
 		print >> sys.stderr, "# Process finished", time.asctime()
 
 	# in kmer mode:
