@@ -60,7 +60,7 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
    
    `kmersorter.py -T -k 31 -p 8 -a 45 -b 80 -s 0.35 -w 0.45 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
 
-8. To count kmer coverage of long reads (such as Sanger, Moleculo, etc.) or contigs, use the `-L` option in kmersorter. This will calculate the median kmer coverage of the Illumina reads on each long read, that is, even though the coverage might be lower in the long read library, individual spots should become even more distinct on the plot because they are using the Illumina kmer coverage. In this example, the `-S` option is used to only calculate the stats at this step, however this can be excluded and used with filtering options. The original paired reads can be ignored for this step.
+8. To count kmer coverage of long reads (such as Sanger, PacBio, Moleculo, etc.) or contigs, use the `-L` option in kmersorter. This will calculate the median kmer coverage of the Illumina reads on each long read, that is, even though the coverage might be lower in the long read library, individual spots should become even more distinct on the plot because they are using the Illumina kmer coverage. In this example, the `-S` option is used to only calculate the stats at this step, however this can be excluded and used with filtering options. The original paired reads can be ignored for this step.
 
    `kmersorter.py -T -k 31 -p 8 -S -D ~/trinityrnaseq/ -L long_reads.fq fastq.dumps`
    
@@ -71,6 +71,10 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
 9. Generate a long-read coverage to GC map, similar to the above step, except with the addition of the `-p` option. This option indicates that reads are not a standard length, and percentage GC should be calculated for each read.
 
    `fastqdumps2histo.py -s long_reads.stats -f long_reads.fq -u 1000 -T -p - > long_reads.gc_cov.histo.csv`
+   
+   This script assumes that fastq files are always 4 lines and fasta files are always 2 lines. If your fasta format files (say for assembled contigs) are more than 2 lines per sequence (which would be header line and sequence line), then convert them first using the fasta2twoline.py script.
+   
+   `fasta2twoline.py contigs.fasta > twoline_contigs.fasta`
 
 ## Usage considerations
 #### Choosing k-mer length
