@@ -60,17 +60,17 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
    
    `kmersorter.py -T -k 31 -p 8 -a 45 -b 80 -s 0.35 -w 0.45 -D ~/trinityrnaseq/ -1 reads_1.fq -2 reads_2.fq fastq.dumps`
 
-8. To count kmer coverage of long reads (Sanger, Moleculo, etc.), use the `-L` option in kmersorter. This will calculate the median kmer coverage of the Illumina reads on each long read, that is, even though the coverage might be lower in the long read library, individual spots should become even more distinct on the plot because they are using the Illumina kmer coverage. The program was written for paired end reads, so two files must still be submitted, but one can contain a single sequence, or could be short/long sequences, or two different libraries. In this example, the `-S` option is used to only calculate the stats at this step, however this can be excluded and used with filtering options.
+8. To count kmer coverage of long reads (such as Sanger, Moleculo, etc.) or contigs, use the `-L` option in kmersorter. This will calculate the median kmer coverage of the Illumina reads on each long read, that is, even though the coverage might be lower in the long read library, individual spots should become even more distinct on the plot because they are using the Illumina kmer coverage. In this example, the `-S` option is used to only calculate the stats at this step, however this can be excluded and used with filtering options. The original paired reads can be ignored for this step.
 
-   `kmersorter.py -T -L -k 31 -p 8 -S -D ~/trinityrnaseq/ -1 long_reads.fq -2 extra_long_reads.fq fastq.dumps`
+   `kmersorter.py -T -k 31 -p 8 -S -D ~/trinityrnaseq/ -L long_reads.fq fastq.dumps`
    
    After stats are generated, the filter options can be applied as above to select groups of reads by coverage or GC. 
 
-   `kmersorter.py -T -L -k 31 -p 8 -a 45 -b 80 -s 0.35 -w 0.45 -D ~/trinityrnaseq/ -1 long_reads.fq -2 extra_long_reads.fq fastq.dumps`
+   `kmersorter.py -T -k 31 -p 8 -a 45 -b 80 -s 0.35 -w 0.45 -D ~/trinityrnaseq/ -L long_reads.fq fastq.dumps`
 
 9. Generate a long-read coverage to GC map, similar to the above step, except with the addition of the `-p` option. This option indicates that reads are not a standard length, and percentage GC should be calculated for each read.
 
-   `fastqdumps2histo.py -s long_reads.stats extra_long_reads.stats -f long_reads.fq extra_long_reads.fq -u 1000 -T -p - > long_reads.gc_cov.histo.csv`
+   `fastqdumps2histo.py -s long_reads.stats -f long_reads.fq -u 1000 -T -p - > long_reads.gc_cov.histo.csv`
 
 ## Usage considerations
 #### Choosing k-mer length
