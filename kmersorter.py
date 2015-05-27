@@ -1,10 +1,7 @@
 #! /usr/bin/env python
 #
-# added Trinity mode for better coverage slices 2015-04-19
-# kmersorter.py v1.1 2015-03-03
-# sorts kmers based on coverage from jellyfish dump
-
 '''
+kmersorter.py v1.2 2015-05-27
 # take jellyfish kmer dumps and sort by coverage
 
   1) using the compressed reads, count the kmers
@@ -65,6 +62,7 @@ def fastq_line_acc(line):
 def stats_to_dict(statfile, above, below):
 	sd = {}
 	readCount, addCount = 0,0
+	print >> sys.stderr, "# Reading stats file", statfile, time.asctime()
 	for line in open(statfile, 'r'):
 		# in order to save memory, stats are filtered before adding to dictionary
 		readCount += 1
@@ -102,6 +100,30 @@ def get_header_from_seqtype(seqtype):
 		return "@", 4
 	else:
 		return ">", 2
+
+def convert_to_fasta(fastool_path, reads):
+	# this is one of two functions dependent on a Trinity program, calling fastool
+	print >> sys.stderr, "### Converting reads to fasta", time.asctime()
+	fasta_reads = "%s.fasta" % (os.path.splitext(reads)[0])
+	if os.path.isfile(fasta_reads):
+		print >> sys.stderr, "# Reads already converted, skipping...", time.asctime()
+	else:
+		fastool_args = [fastool_path, "--illumina-trinity", "--to-fasta", reads]
+		with open(fasta_reads, 'a') as fr:
+			subprocess.call(fastool_args, stdout=fr)
+	return fasta_reads
+
+def kmer_cov_to_stats(kmertocov_path, reads, jfdump, kmer, threads):
+	# this function is dependent on the Trinity Inchworm program fastaToKmerCoverageStats
+	stats_filename = "%s.k%d.stats" % (reads, kmer)
+	if os.path.isfile(stats_filename):
+		print >> sys.stderr, "# Coverage already counted for %s, skipping..." % (reads), time.asctime()
+	else:
+		print >> sys.stderr, "# Counting coverage on:", reads, time.asctime()
+		kmertocov_args = [kmertocov_path, "--reads", reads, "--kmers", jfdump, "--kmer_size", "%d" % kmer, "--num_threads", "%d" % threads, "--DS"]
+		with open(stats_filename, 'w') as sf:
+			subprocess.call(kmertocov_args, stdout=sf)
+	return stats_filename
 
 def collect_reads(statdict1, statdict2, reads1, reads2, left_filt, right_filt, above, below, strong, weak, seqtype):
 	# this part was formerly a blatant rip off of Trinity's nbkc_normalize.pl script
@@ -213,11 +235,11 @@ def main(argv, wayout):
 	parser.add_argument('-t', '--type', help="input files and line numbering are fasta or fastq [auto-detect]", default='auto')
 	parser.add_argument('-k', '--kmer', type=int, metavar='N', default=25, help="kmer length [25]")
 	parser.add_argument('-l', '--lowercase', action="store_true", help="convert sequences to lowercase")
-	parser.add_argument('-1', '--left-reads', help="fastq reads 1 of a pair")
-	parser.add_argument('-2', '--right-reads', help="fastq reads 2 of a pair")
 	parser.add_argument('-T', '--trinity', action="store_true", help="use Trinity method to extract reads")
-	parser.add_argument('-L', '--long-reads', action="store_true", help="files are long reads to be counted separately")
 	parser.add_argument('-D', '--directory', help="trinity directory")
+	parser.add_argument('-1', '--left-reads', help="fastq reads 1 of a pair, where length is constant")
+	parser.add_argument('-2', '--right-reads', help="fastq reads 2 of a pair, where length is constant")
+	parser.add_argument('-L', '--long-reads', help="file of long reads, contigs, or single end reads")
 	parser.add_argument('-c', '--stdev-cutoff', type=int, metavar='N', default=200, help="upper limit for standard deviation cutoff [200]")
 	parser.add_argument('-p', '--processors', type=int, metavar='N', default=1, help="number of CPUs [1]")
 	parser.add_argument('-S', '--stats', action="store_false", help="only collect left and right stats in Trinity mode")
@@ -254,6 +276,7 @@ def main(argv, wayout):
 			sys.exit()
 
 	if args.trinity:
+		# PART I - checking setup before trying anything
 		print >> sys.stderr, "### Running Trinity type read sorting", time.asctime()
 		if args.directory and os.path.isdir(args.directory):
 			print >> sys.stderr, "# Using Trinity directory %s" % (args.directory), time.asctime()
@@ -262,9 +285,7 @@ def main(argv, wayout):
 			print >> sys.stderr, "# Must provide a valid directory -D", time.asctime()
 			print >> sys.stderr, "# Exiting", time.asctime()
 			sys.exit()
-		#
-		if args.long_reads:
-			print >> sys.stderr, "# Treating reads as separate long-read files", time.asctime()
+
 		# check if all programs are there
 		print >> sys.stderr, "### Checking for sub programs", time.asctime()
 		fastool_path = os.path.join(trinity_dir, "trinity-plugins/fastool/fastool")
@@ -281,66 +302,59 @@ def main(argv, wayout):
 			sys.exit()
 
 		print >> sys.stderr, "### Checking input files", time.asctime()
-		if os.path.isfile(args.left_reads) and os.path.isfile(args.right_reads):
-			print >> sys.stderr, "# Reads found... OK"
-			headerType, seqLength = get_fastx_type(args.left_reads)
-			if not args.long_reads:
-				print >> sys.stderr, "# Detected read length of %d... OK" % (seqLength)
-			if args.type=="auto":
-				seqType = fastx_header_to_type(headerType)
-				print >> sys.stderr, "# Detected seq type %s... OK" % (seqType)
-			elif args.type=="fastq":
-				seqType = args.type
-			elif args.type=="fasta":
-				seqType = args.type
-			else:
-				print >> sys.stderr, "# Error unknown sequence type, %s" % (args.type)
-				print >> sys.stderr, "# Exiting", time.asctime()
-				sys.exit()
-		else:
-			print >> sys.stderr, "# Cannot find input reads %s, %s" % (args.left_reads, args.right_reads)
-			print >> sys.stderr, "# Exiting", time.asctime()
-			sys.exit()
+		if args.left_reads and args.right_reads:
+			if os.path.isfile(args.left_reads) and os.path.isfile(args.right_reads):
+				print >> sys.stderr, "# Reads found... OK"
+				headerType, seqLength = get_fastx_type(args.left_reads)
+				if not args.long_reads:
+					print >> sys.stderr, "# Detected read length of %d... OK" % (seqLength)
+				if args.type=="auto":
+					seqType = fastx_header_to_type(headerType)
+					print >> sys.stderr, "# Detected seq type %s... OK" % (seqType)
+				elif args.type=="fastq":
+					seqType = args.type
+				elif args.type=="fasta":
+					seqType = args.type
+				else:
+					print >> sys.stderr, "# Error unknown sequence type, %s" % (args.type)
+					print >> sys.stderr, "# Exiting", time.asctime()
+					sys.exit()
+		if args.long_reads and os.path.isfile(args.long_reads):
+			print >> sys.stderr, "# Long reads found... OK"
+			longheaderType, longseqLength = get_fastx_type(args.long_reads)
 
+		## PART II - actually running the programs
 		# most of this pipeline is copied from Trinity insilico_read_normalization.pl
 		print >> sys.stderr, "### Converting reads to fasta", time.asctime()
-		if seqType == "fasta":
-			print >> sys.stderr, "# Input type already fasta, skipping...", time.asctime()
-			left_reads = args.left_reads
-			right_reads = args.right_reads
-		else:
-			left_reads = "%s.left.fa" % (os.path.splitext(args.left_reads)[0])
-			right_reads = "%s.right.fa" % (os.path.splitext(args.right_reads)[0])
-			if os.path.isfile(left_reads) and os.path.isfile(right_reads):
-				print >> sys.stderr, "# Reads already converted, skipping...", time.asctime()
+		if args.left_reads and args.right_reads:
+			if seqType == "fasta":
+				print >> sys.stderr, "# Input type already fasta, skipping...", time.asctime()
+				left_reads = args.left_reads
+				right_reads = args.right_reads
 			else:
-				fastool_args = [fastool_path, "--illumina-trinity", "--to-fasta", args.left_reads]
-				with open(left_reads, 'a') as lr:
-					subprocess.call(fastool_args, stdout=lr)
-				fastool_args = [fastool_path, "--illumina-trinity", "--to-fasta", args.right_reads]
-				with open(right_reads, 'a') as rr:
-					subprocess.call(fastool_args, stdout=rr)
+				left_reads = convert_to_fasta(fastool_path, args.left_reads)
+				right_reads = convert_to_fasta(fastool_path, args.right_reads)
+		if args.long_reads:
+			longseqType = fastx_header_to_type(longheaderType)
+			if longseqType=="fastq":
+				long_reads = convert_to_fasta(fastool_path, args.long_reads)
+			else:
+				print >> sys.stderr, "# Input type already fasta, skipping...", time.asctime()
+				long_reads = args.long_reads
 
 		print >> sys.stderr, "### Generating coverage stats", time.asctime()
-		left_stats = "%s.k%d.stats" % (left_reads, args.kmer)
-		right_stats = "%s.k%d.stats" % (right_reads, args.kmer)
-		if os.path.isfile(left_stats) and os.path.isfile(right_stats):
-			print >> sys.stderr, "# Coverage already counted, skipping...", time.asctime()
-		else:
-			print >> sys.stderr, "# Counting left coverage:", left_reads, time.asctime()
-			kmertocov_args = [kmertocov_path, "--reads", left_reads, "--kmers", args.input_file, "--kmer_size", "%d" % args.kmer, "--num_threads", "%d" % args.processors, "--DS"]
-			with open(left_stats, 'w') as ls:
-				subprocess.call(kmertocov_args, stdout=ls)
-			print >> sys.stderr, "# Counting right coverage:", right_reads, time.asctime()
-			kmertocov_args = [kmertocov_path, "--reads", right_reads, "--kmers", args.input_file, "--kmer_size", "%d" %  args.kmer, "--num_threads", "%d" % args.processors, "--DS"]
-			with open(right_stats, 'w') as rs:
-				subprocess.call(kmertocov_args, stdout=rs)
+		if args.left_reads and os.path.isfile(left_reads):
+			left_stats = kmer_cov_to_stats(kmertocov_path, left_reads, args.input_file, args.kmer, args.processors)
+		if args.right_reads and os.path.isfile(right_reads):
+			right_stats = kmer_cov_to_stats(kmertocov_path, right_reads, args.input_file, args.kmer, args.processors)
+		if args.long_reads and os.path.isfile(long_reads):
+			long_stats = kmer_cov_to_stats(kmertocov_path, long_reads, args.input_file, args.kmer, args.processors)
 
 		if args.stats:
+			print >> sys.stderr, "### Sorting reads by coverage and/or GC", time.asctime()
 			if args.above==1 and args.below==10000 and args.strong==0.0 and args.weak==1.0:
 				print >> sys.stderr, "# No cutoffs specified, -a -b -s -w", time.asctime()
 			else:
-				print >> sys.stderr, "### Sorting read pairs by coverage", time.asctime()
 				# this is a list of an empty string so that it can be string-joined later
 				coverage_mods = ['']
 				if not args.above==1 or not args.below==10000:
@@ -352,7 +366,7 @@ def main(argv, wayout):
 					print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
 				else:
 					if args.long_reads:
-						strong, weak = args.strong, args.weak
+						lstrong, lweak = args.strong, args.weak
 						print >> sys.stderr, "# Filtering GC between %.3f and %.3f" % (strong, weak), time.asctime()
 					else:
 						strong = int(seqLength * args.strong + 0.9)
@@ -366,18 +380,18 @@ def main(argv, wayout):
 
 				# generate output file names
 				coverage_string = ".".join(coverage_mods)
-				print >> sys.stderr, "# Reading stats file %s" % left_stats, time.asctime()
-				statDict1 = stats_to_dict(left_stats, args.above, args.below)
-				print >> sys.stderr, "# Reading stats file %s" % right_stats, time.asctime()
-				statDict2 = stats_to_dict(right_stats, args.above, args.below)
+
 				print >> sys.stderr, "### Retrieving reads", time.asctime()
-				left_filt = "%s.k%d%s.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, coverage_string, seqType)
-				right_filt = "%s.k%d%s.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, coverage_string, seqType)
-				if args.long_reads:
-					collect_unpaired(statDict1, args.left_reads, left_filt, args.above, args.below, strong, weak, seqType)
-					collect_unpaired(statDict2, args.right_reads, right_filt, args.above, args.below, strong, weak, seqType)
-				else:
+				if args.left_reads and args.right_reads:
+					statDict1 = stats_to_dict(left_stats, args.above, args.below)
+					statDict2 = stats_to_dict(right_stats, args.above, args.below)
+					left_filt = "%s.k%d%s.%s" % (os.path.splitext(args.left_reads)[0], args.kmer, coverage_string, seqType)
+					right_filt = "%s.k%d%s.%s" % (os.path.splitext(args.right_reads)[0], args.kmer, coverage_string, seqType)
 					collect_reads(statDict1, statDict2, args.left_reads, args.right_reads, left_filt, right_filt, args.above, args.below, strong, weak, seqType)
+				if args.long_reads and long_stats:
+					longstatDict = stats_to_dict(long_stats, args.above, args.below)
+					long_filt = "%s.k%d%s.%s" % (os.path.splitext(args.long_reads)[0], args.kmer, coverage_string, longseqType)
+					collect_unpaired(longstatDict1, args.long_reads, long_filt, args.above, args.below, lstrong, lweak, seqType)
 		print >> sys.stderr, "# Process finished", time.asctime()
 
 	# in kmer mode:
