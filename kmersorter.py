@@ -367,14 +367,14 @@ def main(argv, wayout):
 				else:
 					if args.long_reads:
 						lstrong, lweak = args.strong, args.weak
-						print >> sys.stderr, "# Filtering GC between %.3f and %.3f" % (strong, weak), time.asctime()
+						print >> sys.stderr, "# Filtering GC between %.3f and %.3f" % (lstrong, lweak), time.asctime()
 					else:
 						strong = int(seqLength * args.strong + 0.9)
 						weak = int(seqLength * args.weak + 0.9)
 						print >> sys.stderr, "# Filtering GC between %d and %d" % (strong, weak), time.asctime()
 				if not args.strong==0.0 or not args.weak==1.0:
 					if args.long_reads:
-						coverage_mods.append("s%d.w%d" % (strong*100,weak*100) )
+						coverage_mods.append("s%d.w%d" % (lstrong*100,lweak*100) )
 					else:
 						coverage_mods.append("s%d.w%d" % (strong,weak) )
 
@@ -391,7 +391,7 @@ def main(argv, wayout):
 				if args.long_reads and long_stats:
 					longstatDict = stats_to_dict(long_stats, args.above, args.below)
 					long_filt = "%s.k%d%s.%s" % (os.path.splitext(args.long_reads)[0], args.kmer, coverage_string, longseqType)
-					collect_unpaired(longstatDict1, args.long_reads, long_filt, args.above, args.below, lstrong, lweak, seqType)
+					collect_unpaired(longstatDict, args.long_reads, long_filt, args.above, args.below, lstrong, lweak, longseqType)
 		print >> sys.stderr, "# Process finished", time.asctime()
 
 	# in kmer mode:
