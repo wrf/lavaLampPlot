@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 #
-# fastqdumps2histo.py v1.3 last modified 2015-05-25
+# fastqdumps2histo.py v1.3
 # by WRF
 
 """
-fastqdumps2histo.py v1.3 2015-05-25
+fastqdumps2histo.py v1.3 last modified 2015-05-29
 
     first generate fastq.counts file from zipped reads with jellyfish count
 gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G /dev/fd/0
@@ -91,7 +91,7 @@ def add_cov_to_acc(line, statDict):
 	# or this for SRA files:
 	#53	57.4143	16.8252	29.3049	SRR1032106.2000.1/H	thread:5
 	medCov = int(lsplits[0])
-	acc = lsplits[4].split(" ")[0]
+	acc = lsplits[4].split(" ")[0].rsplit("/",1)
 	# was previously using split("/")[0], caused errors with different split in fastx_line_acc
 	statDict[acc] = medCov
 	# nothing to return
@@ -114,6 +114,7 @@ def count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, gcfunction
 	for line in open(fastxfile, 'r'):
 		linecount += 1
 		if linecount==1 and line[0]==FH:
+			### TODO linecount should be reset when a new header line is found for fasta
 			kmercount += 1
 			acc = fastx_line_acc(line)
 			freq = statDict.get(acc, 0)
@@ -124,6 +125,8 @@ def count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, gcfunction
 			# use try except in case the wrong -u is used or files were merged
 			try:
 				m[gc][freq] += 1
+				#if freq == 1: # for debugging only
+				#	print >> sys.stderr, acc
 			except IndexError:
 				# most likely reason for this is setting -k to kmer rather than read length
 				maxcount += 1
@@ -191,7 +194,8 @@ def main(argv, wayout):
 		for statfile, fastxfile in izip(args.stats, args.fastx):
 			print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
 			statDict = stats_to_dict(statfile)
-			print >> sys.stderr, "Found stats for %d sequences" % len(statDict), time.asctime()
+			statCount = len(statDict)
+			print >> sys.stderr, "Found stats for %d sequences" % statCount, time.asctime()
 			if args.verbose:
 				print >> sys.stderr, "Stats stored in format of: {}".format(statDict.iterkeys().next())
 			print >> sys.stderr, "Reading file %s" % (fastxfile), time.asctime()
