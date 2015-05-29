@@ -91,7 +91,7 @@ def add_cov_to_acc(line, statDict):
 	# or this for SRA files:
 	#53	57.4143	16.8252	29.3049	SRR1032106.2000.1/H	thread:5
 	medCov = int(lsplits[0])
-	acc = lsplits[4].split(" ")[0].rsplit("/",1)
+	acc = lsplits[4].split(" ")[0].rsplit("/",1)[0]
 	# was previously using split("/")[0], caused errors with different split in fastx_line_acc
 	statDict[acc] = medCov
 	# nothing to return
