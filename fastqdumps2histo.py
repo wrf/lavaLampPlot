@@ -76,7 +76,8 @@ def get_gc(kmer):
 	return kmer.count("G")+kmer.count("C")
 
 def get_gc_perc_int(kmer):
-	return (kmer.count("G")+kmer.count("C"))*100/len(kmer.rstrip())
+	# N's must be substracted from total length, otherwise GC values will be too low for scaffolds
+	return (kmer.count("G")+kmer.count("C")) * 100 / ( len(kmer.rstrip()) - kmer.count("N") )
 
 def stats_to_dict(statfile):
 	sd = {}
