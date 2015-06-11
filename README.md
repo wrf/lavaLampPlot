@@ -105,5 +105,8 @@ The previous version of Trinity mode in kmersorter had a problem with the SRA he
 
 This may no longer be a problem since `sort` is no longer called in the Trinity mode for kmersorter. This program was removed since the purpose was to organize the reads in a pair so they could be merged. The merging caused problems for extraction because the merge takes the average of the two coverage medians in a pair, so read coverage of 1 and 99 in a pair would make 50. This does not generate a count on the lava lamp plot, since the stats are counted separately in fastqdumps2histo. However, during extraction of regions in kmersorter, additional/junk reads outside of the defined extraction boundary were collected when neither read was in the defined region.
 
+## Troubleshooting
+Two problems have come up a few times, and sample plots are shown in the error_plots folder. For the case of Acropora, there is a strip at the bottom. This was caused by the sequence in the read spanning multiple lines per read, instead of just one. For this situation, convert the reads to two-line fasta with the `fasta2twoline.py` script. For the other case of Aiptasia, the plot is distorted since the reads were trimmed and are not the same length. To solve this, use the `-p` option in fastqdumps2histo to calculate the length and GC for each sequence.
+
 ## Misc
 As this is not really published work, citing is probably not necessary. Nonetheless, it may be advisable to say that any figures were created using this repo, something like "used lavaLampPlot python and R scripts by WRF".
