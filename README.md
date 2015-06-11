@@ -99,9 +99,11 @@ The merging generates counts that are slightly different from counting them as a
 The manual from jellyfish v1 implies that if the output file is not specified with `-o`, jellyfish should create an extra output file with the default name ("output_") when the hash size is full. I have not tested if this works for sparing memory usage.
 
 #### SRA Files
-The Trinity mode in kmersorter has a problem with the SRA headers generated from the [SRA Toolkit](http://www.ncbi.nlm.nih.gov/books/NBK158900/) fastq-dump (due to problems in the called Trinity scripts). The stats file generation will work normally, but then the stats cannot be sorted correctly and ultimately the process will fail merging the stats. Brian Haas suggested this alternate command to generate the header (which one would also use during Trinity normalization).
+The previous version of Trinity mode in kmersorter had a problem with the SRA headers generated from the [SRA Toolkit](http://www.ncbi.nlm.nih.gov/books/NBK158900/) fastq-dump (due to problems in the called Trinity scripts). The stats file generation would work normally, but then the stats cannot be sorted correctly and ultimately the process will fail merging the stats. Brian Haas suggested this alternate command to generate the header (which one would also use during Trinity normalization).
 
 `fastq-dump --split-files --defline-seq '@$sn[_$rn]/$ri' SRR1032106.sra`
+
+This may no longer be a problem since `sort` is no longer called in the Trinity mode for kmersorter. This program was removed since the purpose was to organize the reads in a pair so they could be merged. The merging caused problems for extraction because the merge takes the average of the two coverage medians in a pair, so read coverage of 1 and 99 in a pair would make 50. This does not generate a count on the lava lamp plot, since the stats are counted separately in fastqdumps2histo. However, during extraction of regions in kmersorter, additional/junk reads outside of the defined extraction boundary were collected when neither read was in the defined region.
 
 ## Misc
 As this is not really published work, citing is probably not necessary. Nonetheless, it may be advisable to say that any figures were created using this repo, something like "used lavaLampPlot python and R scripts by WRF".
