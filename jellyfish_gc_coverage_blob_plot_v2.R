@@ -67,7 +67,7 @@ colorcount = 1000
 # 10 percent of the colors are for white to pink, the rest through the rainbow
 white2pink = colorcount*0.166
 pink2red = colorcount*0.834
-colorset = c(colorRampPalette(c("#FFFFFF","#CC006E"),alpha=0.9)(white2pink), rainbow(pink2red, start=0.91, end=0.89, v=0.8, alpha=0.9) )
+colorset = c(colorRampPalette(c("#FFDDDD","#CC006E"),alpha=0.9)(white2pink), rainbow(pink2red, start=0.91, end=0.89, v=0.8, alpha=0.9) )
 
 # zmax should therefore be either the max of m1 or the defined zmax, whichever is lower
 truezmax = min(max(m1),zmax)
