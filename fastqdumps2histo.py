@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 #
-# fastqdumps2histo.py v1.3
+# fastqdumps2histo.py v1.5
 # by WRF
 
 """
-fastqdumps2histo.py v1.3 last modified 2015-05-29
+fastqdumps2histo.py v1.5 last modified 2015-08-20
 
     first generate fastq.counts file from zipped reads with jellyfish count
 gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G /dev/fd/0
@@ -46,20 +46,21 @@ ACTTGATCGTGATGCTAGTAGCTGT
 
 this file can be imported directly into R for generating lava lamp plots
 
-    for alternate usage in Trinity mode to count read coverage and GC
+    FOR USAGE IN TRINITY MODE - count read coverage and GC
     use the intermediate output files (.stats) from kmersorter.py
-fastqdumps2histo.py -f *.fastq -s *.stats -u 1000 -T - > histo.csv
+fastqdumps2histo.py -f *.fastq.gz -z -s *.stats -u 1000 -T - > histo.csv
 
     -r can set the read length, otherwise it is determined automatically
     -u is set as above
     -f are the original fastq reads (use wildcard or list multiple)
-       this could also be a subset of the original reads
+       this could also be a subset of the original reads, or gzipped files
     -s are the .stats files for each read
     -t to specify fasta read files (-t fasta)
     -T - must set both -T for Trinity mode and - for null input
     -k is unused for this step
+    -z used to indicate that reads are gzipped
 
-    for Trinity mode with long reads (such as sanger ESTs)
+    FOR TRINITY MODE WITH LONG READS (such as Sanger ESTs)
     use the -p option to calculate GC as percentage rather than raw count
 fastqdumps2histo.py -f reads.fasta -s reads.stats -u 1000 -T -p - > histo.csv
 """
@@ -67,6 +68,7 @@ fastqdumps2histo.py -f reads.fasta -s reads.stats -u 1000 -T -p - > histo.csv
 import sys
 import argparse
 import time
+import gzip
 from itertools import izip
 
 def get_freq(line):
@@ -78,6 +80,10 @@ def get_gc(kmer):
 def get_gc_perc_int(kmer):
 	# N's must be substracted from total length, otherwise GC values will be too low for scaffolds
 	return (kmer.count("G")+kmer.count("C")) * 100 / ( len(kmer.rstrip()) - kmer.count("N") )
+
+def get_gc_perc_float(kmer):
+	# N's must be substracted from total length, otherwise GC values will be too low for scaffolds
+	return (kmer.count("G")+kmer.count("C")) * 100.0 / ( len(kmer.rstrip()) - kmer.count("N") )
 
 def stats_to_dict(statfile):
 	sd = {}
@@ -100,8 +106,8 @@ def add_cov_to_acc(line, statDict):
 def fastx_line_acc(line):
 	return line.rstrip().split(" ")[0][1:]
 
-def get_fastx_type(seqsFile, verbose):
-	with open(seqsFile, 'r') as lr:
+def get_fastx_type(seqsFile, verbose, opentype):
+	with opentype(seqsFile, 'r') as lr:
 		headerLine = lr.readline()
 		headerType = headerLine[0]
 		seqLength = len(lr.readline().rstrip())
@@ -110,9 +116,9 @@ def get_fastx_type(seqsFile, verbose):
 			print >> sys.stderr, "Header starts with: {}".format(headerType)
 	return headerType, seqLength
 
-def count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, gcfunction):
+def count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, gcfunction, opentype):
 	linecount = 0
-	for line in open(fastxfile, 'r'):
+	for line in opentype(fastxfile, 'r'):
 		linecount += 1
 		if linecount==1 and line[0]==FH:
 			### TODO linecount should be reset when a new header line is found for fasta
@@ -139,22 +145,40 @@ def count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, gcfunction
 			linecount = 0
 	return m, kmercount, maxcount
 
+def count_list(fastxfile, statDict, FH, LC, kmercount, gcfunction, wayout, opentype):
+	linecount = 0
+	for line in opentype(fastxfile, 'r'):
+		linecount += 1
+		if linecount==1 and line[0]==FH:
+			kmercount += 1
+			acc = fastx_line_acc(line)
+			freq = statDict.get(acc, 0)
+		elif linecount==2:
+			gc = gcfunction(line)
+		# if it is the last line of each sequence, so cannot be elif
+		if linecount==LC:
+			print >> wayout, acc, freq, "{:.4f}".format(gc)
+			linecount = 0
+	return kmercount
+
 def main(argv, wayout):
 	if not len(argv):
 		argv.append("-h")
 	parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
 	parser.add_argument('input_file', type = argparse.FileType('rU'), default='-', help="fasta format file")
 	parser.add_argument('-d', '--delimiter', default=",", help="use alternate delimiter [,]")
-	parser.add_argument('-f', '--fastx', nargs='*', help="fastx files, either fasta or fastq")
+	parser.add_argument('-f', '--fastx', nargs='*', help="fastx files, either fasta or fastq, can be gzipped with -z")
 	parser.add_argument('-j', '--jellyfish', help="optional file for the filtered jellyfish dump")
 	parser.add_argument('-k', '--kmer', type=int, metavar='N', default=25, help="kmer length [25]")
 	parser.add_argument('-l', '--lower', type=int, metavar='N', default=2, help="lower limit for optional jellyfish dump [2]")
 	parser.add_argument('-p', '--percentage', action="store_true", help="count GC as percentage for long reads, not by fixed read length (ignores -r)")
+	parser.add_argument('-L', '--list', action="store_true", help="print one line for each sequence rather than matrix, overrides -p and -T")
 	parser.add_argument('-r', '--read-length', type=int, metavar='N', help="read length for Trinity mode [auto-detect]")
 	parser.add_argument('-s', '--stats', nargs='*', help="Trinity stats files")
 	parser.add_argument('-t', '--type', help="sequence type, fasta, fastq or [auto-detect]")
 	parser.add_argument('-T', '--trinity', action="store_true", help="use Trinity method to extract reads")
 	parser.add_argument('-u', '--upper', type=int, metavar='N', default=1000, help="upper limit for histogram [1000]")
+	parser.add_argument('-z', '--gzip', action="store_true", help="reads are gzipped, .gz")
 	parser.add_argument('-v', '--verbose', action="store_true", help="extra output for debugging")
 	args = parser.parse_args(argv)
 
@@ -164,14 +188,19 @@ def main(argv, wayout):
 	maxcount = 0
 	kmertag = "kmers"
 
-	if args.trinity:
+	if args.trinity or args.list:
 		# checking for matching stats and fastx files
 		if len(args.stats) != len(args.fastx):
 			print >> sys.stderr, "ERROR Unequal numbers of stats and %s files" % args.type, time.asctime()
 			print >> sys.stderr, "Exiting", time.asctime()
 			sys.exit()
+		# use gzip open if files are specified as gzip with -z
+		if args.gzip:
+			opentype = gzip.open
+		else:
+			opentype = open
 		# autodetect length and header type from fastx files
-		FH, seqLen = get_fastx_type(args.fastx[0], args.verbose)
+		FH, seqLen = get_fastx_type(args.fastx[0], args.verbose, opentype)
 		# checking for sequence type and getting basic parameters of sequence parsing
 		if (FH=="@" or args.type=="fastq"):
 			LC = 4
@@ -200,10 +229,13 @@ def main(argv, wayout):
 			if args.verbose:
 				print >> sys.stderr, "Stats stored in format of: {}".format(statDict.iterkeys().next())
 			print >> sys.stderr, "Reading file %s" % (fastxfile), time.asctime()
-			if args.percentage:
-				m, kmercount, maxcount = count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, get_gc_perc_int)
+			if args.percentage or args.list:
+				if args.list:
+					kmercount = count_list(fastxfile, statDict, FH, LC, kmercount, get_gc_perc_float, wayout, opentype)
+				else:
+					m, kmercount, maxcount = count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, get_gc_perc_int, opentype)
 			else:
-				m, kmercount, maxcount = count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, get_gc)
+				m, kmercount, maxcount = count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, get_gc, opentype)
 			if sum(x[0] for x in m)==kmercount:
 				print >> sys.stderr, "ERROR No stats found for reads", time.asctime()
 		kmertag = "reads"
@@ -236,9 +268,11 @@ def main(argv, wayout):
 					jfwroteback += 1
 		if args.jellyfish:
 			jf.close()
-	print >> sys.stderr, "Writing counts", time.asctime()
-	for i in m:
-		print >> wayout, args.delimiter.join([str(j) for j in i])
+
+	if not args.list: # write matrix if not in list mode
+		print >> sys.stderr, "Writing counts", time.asctime()
+		for i in m:
+			print >> wayout, args.delimiter.join([str(j) for j in i])
 
 	print >> sys.stderr, "Counted %d %s" % (kmercount, kmertag), time.asctime()
 	if maxcount:
