@@ -4,7 +4,7 @@
 # by WRF
 
 """
-fastqdumps2histo.py v1.5 last modified 2015-08-20
+fastqdumps2histo.py v1.5 last modified 2015-08-24
 
     first generate fastq.counts file from zipped reads with jellyfish count
 gzip -dc reads.fastq.gz | jellyfish count -m 25 -o fastq.counts -C -U 1000 -s 1G /dev/fd/0
@@ -61,6 +61,7 @@ fastqdumps2histo.py -f *.fastq.gz -z -s *.stats -u 1000 -T - > histo.csv
     -z used to indicate that reads are gzipped
 
     FOR TRINITY MODE WITH LONG READS (such as Sanger ESTs)
+    OR FOR LIBRARIES OF DIFFERENT LENGTH READS (such as 100bp and 125bp)
     use the -p option to calculate GC as percentage rather than raw count
 fastqdumps2histo.py -f reads.fasta -s reads.stats -u 1000 -T -p - > histo.csv
 """
@@ -86,9 +87,12 @@ def get_gc_perc_float(kmer):
 	return (kmer.count("G")+kmer.count("C")) * 100.0 / ( len(kmer.rstrip()) - kmer.count("N") )
 
 def stats_to_dict(statfile):
+	print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
 	sd = {}
-	for line in open(statfile, 'r'):
+	for line in open(statfile, 'r').readlines():
 		add_cov_to_acc(line, sd)
+	statCount = len(sd)
+	print >> sys.stderr, "Found stats for %d sequences" % statCount, time.asctime()
 	return sd
 
 def add_cov_to_acc(line, statDict):
@@ -104,7 +108,8 @@ def add_cov_to_acc(line, statDict):
 	# nothing to return
 
 def fastx_line_acc(line):
-	return line.rstrip().split(" ")[0][1:]
+	# added rsplit to work with add_cov_to_acc
+	return line.rstrip().split(" ")[0][1:].rsplit("/",1)[0]
 
 def get_fastx_type(seqsFile, verbose, opentype):
 	with opentype(seqsFile, 'r') as lr:
@@ -116,7 +121,11 @@ def get_fastx_type(seqsFile, verbose, opentype):
 			print >> sys.stderr, "Header starts with: {}".format(headerType)
 	return headerType, seqLength
 
-def count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, gcfunction, opentype):
+def count_matrix(fastxfile, statfile, FH, LC, m, kmercount, maxcount, gcfunction, opentype, verbose):
+	statDict = stats_to_dict(statfile)
+	if verbose:
+		print >> sys.stderr, "Stats stored in format of: {}".format(statDict.iterkeys().next())
+	print >> sys.stderr, "Reading file %s" % (fastxfile), time.asctime()
 	linecount = 0
 	for line in opentype(fastxfile, 'r'):
 		linecount += 1
@@ -145,7 +154,11 @@ def count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, gcfunction
 			linecount = 0
 	return m, kmercount, maxcount
 
-def count_list(fastxfile, statDict, FH, LC, kmercount, gcfunction, wayout, opentype):
+def count_list(fastxfile, statfile, FH, LC, kmercount, gcfunction, wayout, opentype, verbose):
+	statDict = stats_to_dict(statfile)
+	if verbose:
+		print >> sys.stderr, "Stats stored in format of: {}".format(statDict.iterkeys().next())
+	print >> sys.stderr, "Reading file %s" % (fastxfile), time.asctime()
 	linecount = 0
 	for line in opentype(fastxfile, 'r'):
 		linecount += 1
@@ -222,20 +235,13 @@ def main(argv, wayout):
 
 		# iterate over pairs of fastx and stats files
 		for statfile, fastxfile in izip(args.stats, args.fastx):
-			print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
-			statDict = stats_to_dict(statfile)
-			statCount = len(statDict)
-			print >> sys.stderr, "Found stats for %d sequences" % statCount, time.asctime()
-			if args.verbose:
-				print >> sys.stderr, "Stats stored in format of: {}".format(statDict.iterkeys().next())
-			print >> sys.stderr, "Reading file %s" % (fastxfile), time.asctime()
 			if args.percentage or args.list:
 				if args.list:
-					kmercount = count_list(fastxfile, statDict, FH, LC, kmercount, get_gc_perc_float, wayout, opentype)
+					kmercount = count_list(fastxfile, statfile, FH, LC, kmercount, get_gc_perc_float, wayout, opentype, args.verbose)
 				else:
-					m, kmercount, maxcount = count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, get_gc_perc_int, opentype)
+					m, kmercount, maxcount = count_matrix(fastxfile, statfile, FH, LC, m, kmercount, maxcount, get_gc_perc_int, opentype, args.verbose)
 			else:
-				m, kmercount, maxcount = count_matrix(fastxfile, statDict, FH, LC, m, kmercount, maxcount, get_gc, opentype)
+				m, kmercount, maxcount = count_matrix(fastxfile, statfile, FH, LC, m, kmercount, maxcount, get_gc, opentype, args.verbose)
 			if sum(x[0] for x in m)==kmercount:
 				print >> sys.stderr, "ERROR No stats found for reads", time.asctime()
 		kmertag = "reads"
