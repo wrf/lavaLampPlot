@@ -6,6 +6,8 @@ This includes a few scripts to generate a "lava lamp" plot of kmer coverage sepa
 
 Two example plots are shown for *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.nih.gov/sra/SRX378887) using a kmer of 31. The putative symbiont is visible in the plot with a high GC content. The second plot counts based on GC of the full read and median coverage kmers in that read, rather than the kmers alone.
 
+This is conceptually similar to what is done in the "blob" plots by [blobtools](https://github.com/DRL/blobtools), though that process makes use of assembled contigs while this one considers the raw reads.
+
 Steps for analysis and generation of the plots. Some of the instructions were borrowed from Joe Ryan's [estimate genome size](https://github.com/josephryan/estimate_genome_size.pl) script:
 
 ## Dependencies
