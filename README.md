@@ -6,7 +6,7 @@ This includes a few scripts to generate a "lava lamp" plot of kmer coverage sepa
 
 Two example plots are shown for *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.nih.gov/sra/SRX378887) using a kmer of 31. The putative symbiont is visible in the plot with a high GC content. The second plot counts based on GC of the full read and median coverage kmers in that read, rather than the kmers alone.
 
-This is conceptually similar to what is done in the "blob" plots by [blobtools](https://github.com/DRL/blobtools), though that process makes use of assembled contigs while this one considers the raw reads.
+This is conceptually similar to what is done in the "blob" plots by [blobtools](https://drl.github.io/blobtools/), (paper [here](http://journal.frontiersin.org/article/10.3389/fgene.2013.00237/full)) though that process makes use of assembled contigs while this one considers the raw reads.
 
 Steps for analysis and generation of the plots. Some of the instructions were borrowed from Joe Ryan's [estimate genome size](https://github.com/josephryan/estimate_genome_size.pl) script:
 
@@ -38,9 +38,9 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
    
    `jellyfish dump fastq.counts | fastqdumps2histo.py -k 31 -u 1000 -j fastq.dumps - > fastq.gc_cov.histo.csv`
 
-3. Configure the R script for this .csv file, and pdf output. Add text to annotate the plot as needed with the  `text(x,y,"important things")` command. The X and Y values correspond to the center position of the X and the GC count (not the percentage). Thus a GC of 25% would be something like 7 or 8 for a kmer of 31. This script can be run interactively in an R environment (such as RKWard or RCommander) or in the command line.
+3. Configure the R script for this .csv file, and pdf output. Add text to annotate the plot as needed with the  `text(x,y,"important things")` command. The X and Y values correspond to the center position of the X and the GC count (not the percentage). Thus a GC of 25% would be something like 7 or 8 for a kmer of 31. This script can be run interactively in an R environment (such as RKWard or RCommander) or in the command line. For the command line, an optional 3rd argument can be given to change the X-axis scale (default is 1000).
 
-   `Rscript jellyfish_gc_coverage_blob_plot_v2.R`
+   `Rscript jellyfish_gc_coverage_blob_plot_v2.R fastq.gc_cov.histo.csv counts_k31_gc_cov.pdf`
 
 4. Slice out sections of reads based on kmer coverage. This requires finally generating the jellyfish dump file, so that will be redone first if it was not done at the earlier step. 
 
