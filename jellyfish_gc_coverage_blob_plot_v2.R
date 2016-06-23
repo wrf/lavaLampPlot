@@ -1,18 +1,16 @@
 # plot jellyfish kmer coverage vs gc content in lava lamp form
-# v2 last modified 2015-05-19
+# v2 last modified 2016-06-23
 
 # this script was generated using R version 3.1.3
 # generate csv matrix of outputs using fastqdumps2histo.py
 
 # run in the command line with:
-# $ Rscript jellyfish_gc_coverage_blob_plot_v2.R
+# $ Rscript jellyfish_gc_coverage_blob_plot_v2.R inputfile.csv output_graph.pdf [y-max]
 
-### CHANGE THIS FILE TO THE CSV FROM THE PREVIOUS STEP
-f1 = "~/genomes/hydra_vulgaris/hydra_vulgaris_SRR1032106.k31.gc_vs_cov.csv"
-
-### RENAME THIS TO THE DESIRED OUTPUT PDF
-# change this for the output pdf, note that the pdf extension may be required
-outfilename = "~/genomes/hydra_vulgaris/hydra_vulgaris_k31_vs_gc_with_scale.pdf"
+### FILE NAMES FOR INPUT AND OUTPUT ARE TAKEN FROM COMMAND LINE ARGUMENTS
+args = commandArgs(trailingOnly=TRUE)
+f1 = args[1]
+outfilename = args[2]
 
 ### SET THESE PARAMETERS BASED ON DESIRED OUTPUT
 # withscale draws a scalebar to the right, withline means draw the log line overlay
@@ -28,7 +26,12 @@ refinecolors = TRUE
 
 ### CHANGE THIS VALUE BASED ON JELLYFISH -U OPTION
 # or to subset or make the matrix smaller, change ymax, say to view from 0 to 500
+if (length(args)>2) {
+ymax = as.numeric(args[3])
+} else {
 ymax = 1000
+}
+print(ymax)
 # change zmax to correct color resolution, in case the real max is lower than zmax
 zmax = 1000000
 
