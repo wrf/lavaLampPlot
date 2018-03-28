@@ -1,5 +1,5 @@
 # lavaLampPlot
-instructions, python and R code for generating lava lamp plots of kmer coverage
+instructions, python and R code for generating lava lamp plots of kmer coverage as the kmers themselves, or based on the raw reads
 
 ## Overview
 This includes a few scripts to generate a "lava lamp" plot of kmer coverage separated by GC content of the kmers. This is usually enough to reveal heterozygosity or the presence of symbionts with very different GC content than the host.
@@ -13,7 +13,7 @@ This is conceptually similar to what is done in the "blob" plots by [blobtools](
 Steps for analysis and generation of the plots. Some of the instructions were borrowed from Joe Ryan's [estimate genome size](https://github.com/josephryan/estimate_genome_size.pl) script:
 
 ## Dependencies
-Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) (or another preferred kmer counter, I guess...). If you are using Trinity for transcriptome assembly, then you already have it since the jellyfish binary is supplied with Trinity in the `trinity-plugins/` folder.
+Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) (or another preferred kmer counter). If you are using [Trinity for transcriptome assembly](https://github.com/trinityrnaseq/trinityrnaseq/wiki), then you already have it since the jellyfish binary is supplied with Trinity in the `trinity-plugins/` folder.
 
 ## Operation
 1. Run jellyfish on the raw genomic data.
@@ -28,7 +28,7 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
   
    `gzip -dc *.fastq.gz | jellyfish count -m 31 -s 2G -C -o fastq.counts -U 1000 -t 8 /dev/fd/0`
   
-   `-s` is the memory buffer, 2G (2 billion, or 2000000000) is safe for many analyses, though the array will expand if it is maxed out. This can consume a lot of memory (30-50Gb), so it is not advisable to run on a laptop. `-U` is the max coverage to count. 1000 will catch mostly transposons. `-t` is the thread count. `-C` refers to canonical counting, meaning both + and - strands. 
+   `-s` is the memory buffer, 2G (2 billion, or 2000000000) is safe for many analyses, though the array will expand if it is maxed out. This can consume a lot of memory (30-50Gb), so it is not advisable to run on a laptop. `-U` is the max coverage to count. 1000 will catch mostly transposons. `-t` is the thread count / number of CPUs. `-C` refers to canonical counting, meaning both + and - strands. 
 
    Optionally, a lower limit can be set with `-L`. For generating kmer plots (step 3 below) this would affect the data and not be advised, but for the read plots (steps 4 and 5), the Trinity program fastaToKmerCoverageStats assumes that any values below 2 are 1. Since the bulk of the kmers have a count of 1 (66% in the *Hydra* sample), this makes a much smaller file and will run faster at subsequent steps.
 
@@ -107,10 +107,10 @@ The previous version of Trinity mode in kmersorter had a problem with the SRA he
 
 `fastq-dump --split-files --defline-seq '@$sn[_$rn]/$ri' SRR1032106.sra`
 
-This may no longer be a problem since `sort` is no longer called in the Trinity mode for kmersorter. This program was removed since the purpose was to organize the reads in a pair so they could be merged. The merging caused problems for extraction because the merge takes the average of the two coverage medians in a pair, so read coverage of 1 and 99 in a pair would make 50. This does not generate a count on the lava lamp plot, since the stats are counted separately in fastqdumps2histo. However, during extraction of regions in kmersorter, additional/junk reads outside of the defined extraction boundary were collected when neither read was in the defined region.
+This may no longer be a problem since `sort` is no longer called in the Trinity mode for kmersorter. This program was removed since the purpose was to organize the reads in a pair so they could be merged. The merging caused problems for extraction because the merge takes the average of the two coverage medians in a pair, so read coverage of 1 and 99 in a pair would make 50. This does not generate a count on the lava lamp plot, since the stats are counted separately in `fastqdumps2histo.py`. However, during extraction of regions in kmersorter, additional/junk reads outside of the defined extraction boundary were collected when neither read was in the defined region.
 
 ## Troubleshooting
-Two problems have come up a few times, and sample plots are shown in the error_plots folder. For the case of Acropora, there is a strip at the bottom. This was caused by the sequence in the read spanning multiple lines per read, instead of just one. For this situation, convert the reads to two-line fasta with the `fasta2twoline.py` script. For the other case of Aiptasia, the plot is distorted since the reads were trimmed and are not the same length. To solve this, use the `-p` option in fastqdumps2histo to calculate the length and GC for each sequence.
+Two problems have come up a few times, and sample plots are shown in the error_plots folder. For the case of [Acropora](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/acropora_digitifera_15kb-MP_DRR001432_18Gb_k31_reads_u1000.pdf), there is a strip at the bottom. This was caused by the sequence in the read spanning multiple lines per read, instead of just one. For this situation, convert the reads to two-line fasta with the `fasta2twoline.py` script. For the other case of [Aiptasia](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/aiptasia_pallida_550bp-PE_SRR1648349_11Gb_k31_reads_u1000.pdf), the plot is distorted since the reads were trimmed and are not the same length. To solve this, use the `-p` option in `fastqdumps2histo.py` to calculate the length and GC for each sequence.
 
 ## Misc
 As this is not really published work, citing is probably not necessary. Nonetheless, it may be advisable to say that any figures were created using this repo, something like "used lavaLampPlot python and R scripts by WRF".
