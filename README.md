@@ -6,7 +6,7 @@ This includes a few scripts to generate a "lava lamp" plot of kmer coverage sepa
 
 Below is an example plot from *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.nih.gov/sra/SRX378887) using a kmer of 31. The putative symbiont is visible in the plot with a high GC content. The second plot counts based on GC of the full read and median coverage kmers in that read, rather than the kmers alone.
 
-![hydra_vulgaris_SRR1032106_k31_u300_reads.png](https://github.com/wrf/pdbcolor/blob/master/sample_data/hydra_vulgaris_SRR1032106_k31_u300_reads.png)
+![hydra_vulgaris_SRR1032106_k31_u300_reads.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/hydra_vulgaris_SRR1032106_k31_u300_reads.png)
 
 This is conceptually similar to what is done in the "blob" plots by [blobtools](https://drl.github.io/blobtools/), (paper [here](http://journal.frontiersin.org/article/10.3389/fgene.2013.00237/full)) though that process makes use of assembled contigs while this one considers the raw reads directly.
 
