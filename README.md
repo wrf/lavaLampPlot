@@ -4,9 +4,11 @@ instructions, python and R code for generating lava lamp plots of kmer coverage
 ## Overview
 This includes a few scripts to generate a "lava lamp" plot of kmer coverage separated by GC content of the kmers. This is usually enough to reveal heterozygosity or the presence of symbionts with very different GC content than the host.
 
-Two example plots are shown for *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.nih.gov/sra/SRX378887) using a kmer of 31. The putative symbiont is visible in the plot with a high GC content. The second plot counts based on GC of the full read and median coverage kmers in that read, rather than the kmers alone.
+Below is an example plot from *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.nih.gov/sra/SRX378887) using a kmer of 31. The putative symbiont is visible in the plot with a high GC content. The second plot counts based on GC of the full read and median coverage kmers in that read, rather than the kmers alone.
 
-This is conceptually similar to what is done in the "blob" plots by [blobtools](https://drl.github.io/blobtools/), (paper [here](http://journal.frontiersin.org/article/10.3389/fgene.2013.00237/full)) though that process makes use of assembled contigs while this one considers the raw reads.
+![hydra_vulgaris_SRR1032106_k31_u300_reads.png](https://github.com/wrf/pdbcolor/blob/master/sample_data/hydra_vulgaris_SRR1032106_k31_u300_reads.png)
+
+This is conceptually similar to what is done in the "blob" plots by [blobtools](https://drl.github.io/blobtools/), (paper [here](http://journal.frontiersin.org/article/10.3389/fgene.2013.00237/full)) though that process makes use of assembled contigs while this one considers the raw reads directly.
 
 Steps for analysis and generation of the plots. Some of the instructions were borrowed from Joe Ryan's [estimate genome size](https://github.com/josephryan/estimate_genome_size.pl) script:
 
