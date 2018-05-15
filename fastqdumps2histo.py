@@ -90,22 +90,22 @@ def stats_to_dict(statfile):
 	print >> sys.stderr, "Reading stats file %s" % statfile, time.asctime()
 	sd = {}
 	for line in open(statfile, 'r').readlines():
-		add_cov_to_acc(line, sd)
+		lsplits = line.split("\t")
+		# lines of stats file look like:
+		#12	17.6632	10.3014	58.3215	HISEQ:150:C5KTJANXX:4:1101:1469:1959/1	thread:5
+		# or this for SRA files:
+		#53	57.4143	16.8252	29.3049	SRR1032106.2000.1/H	thread:5
+		if len(lsplits) > 5:
+			medCov = int(lsplits[0])
+			acc = lsplits[4].split(" ")[0].rsplit("/",1)[0]
+		else:
+			medCov = int(lsplits[0])
+			acc = lsplits[1].split(" ")[0].rsplit("/",1)[0]
+		# was previously using split("/")[0], caused errors with different split in fastx_line_acc
+		sd[acc] = medCov
 	statCount = len(sd)
 	print >> sys.stderr, "Found stats for %d sequences" % statCount, time.asctime()
 	return sd
-
-def add_cov_to_acc(line, statDict):
-	lsplits = line.split("\t")
-	# lines of stats file look like:
-	#12	17.6632	10.3014	58.3215	HISEQ:150:C5KTJANXX:4:1101:1469:1959/1	thread:5
-	# or this for SRA files:
-	#53	57.4143	16.8252	29.3049	SRR1032106.2000.1/H	thread:5
-	medCov = int(lsplits[0])
-	acc = lsplits[4].split(" ")[0].rsplit("/",1)[0]
-	# was previously using split("/")[0], caused errors with different split in fastx_line_acc
-	statDict[acc] = medCov
-	# nothing to return
 
 def fastx_line_acc(line):
 	# added rsplit to work with add_cov_to_acc

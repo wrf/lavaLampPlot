@@ -1,22 +1,22 @@
 # lavaLampPlot
-instructions, python and R code for generating lava lamp plots of kmer coverage as the kmers themselves, or based on the raw reads
+instructions, python and R code for generating lava lamp plots of kmer coverage as the kmers themselves, or based on the raw reads.
 
 ## Overview
-This includes a few scripts to generate a "lava lamp" plot of kmer coverage separated by GC content of the kmers. This is usually enough to reveal heterozygosity or the presence of symbionts with very different GC content than the host.
+This includes a few scripts to generate a "lava lamp" plot of kmer coverage separated by GC content of the kmers. This is a heat-map of frequency of reads or kmers with a particular coverage and GC content, giving a sense of the coverage of the target species and any symbionts or contaminants.
+
+Such plots are usually sufficient to reveal heterozygosity or the presence of symbionts with very different GC content than the host.
 
 Below is an example plot from *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.nih.gov/sra/SRX378887) using a kmer of 31. The putative symbiont is visible in the plot with a high GC content. The second plot counts based on GC of the full read and median coverage kmers in that read, rather than the kmers alone.
 
 ![hydra_vulgaris_SRR1032106_k31_u300_reads.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/hydra_vulgaris_SRR1032106_k31_u300_reads.png)
 
-This is conceptually similar to what is done in the "blob" plots by [blobtools](https://drl.github.io/blobtools/), (paper [here](http://journal.frontiersin.org/article/10.3389/fgene.2013.00237/full)) though that process makes use of assembled contigs while this one considers the raw reads directly.
-
-Steps for analysis and generation of the plots. Some of the instructions were borrowed from Joe Ryan's [estimate genome size](https://github.com/josephryan/estimate_genome_size.pl) script:
+This is conceptually similar to what is done in the "blob" plots by [blobtools](https://drl.github.io/blobtools/), (paper by [Kumar et al 2013](https://doi.org/10.3389/fgene.2013.00237)) though that process makes use of assembled contigs while this one considers the raw reads directly.
 
 ## Dependencies
 Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) (or another preferred kmer counter). If you are using [Trinity for transcriptome assembly](https://github.com/trinityrnaseq/trinityrnaseq/wiki), then you already have it since the jellyfish binary is supplied with Trinity in the `trinity-plugins/` folder.
 
 ## Operation
-1. Run jellyfish on the raw genomic data.
+1. Run jellyfish on the raw genomic data, i.e. paired end reads.
    
    `jellyfish count -m 31 -s 2G -C -o fastq.counts -U 1000 -t 8 all_reads.fastq`
   
@@ -30,7 +30,7 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
   
    `-s` is the memory buffer, 2G (2 billion, or 2000000000) is safe for many analyses, though the array will expand if it is maxed out. This can consume a lot of memory (30-50Gb), so it is not advisable to run on a laptop. `-U` is the max coverage to count. 1000 will catch mostly transposons. `-t` is the thread count / number of CPUs. `-C` refers to canonical counting, meaning both + and - strands. 
 
-   Optionally, a lower limit can be set with `-L`. For generating kmer plots (step 3 below) this would affect the data and not be advised, but for the read plots (steps 4 and 5), the Trinity program fastaToKmerCoverageStats assumes that any values below 2 are 1. Since the bulk of the kmers have a count of 1 (66% in the *Hydra* sample), this makes a much smaller file and will run faster at subsequent steps.
+   Optionally, a lower limit can be set with `-L`. For generating kmer plots (step 3 below) this would affect the data and not be advised, but for the read plots (steps 4 and 5), the Trinity program `fastaToKmerCoverageStats` assumes that any values below 2 are 1. Since the bulk of the kmers have a count of 1 (66% in the *Hydra* sample), this makes a much smaller file and will run faster at subsequent steps.
 
 2. Write out kmers with coverage counts. This file can be massive (easily 50Gb+, 83G for *Hydra* SRR1032106) so it is instead piped through the python script. `-k` and `-u` are kmer size and max coverage from jellyfish. This step is a single process, so can take some time for very large files with 1 billion+ kmers (20-30 minutes). This generates a matrix of GC vs coverage across all kmers, where the value at each position is the number of unique kmers with that GC and coverage. This is run through python so that R does not have to deal with the counting in addition to the graphing.
    
@@ -80,6 +80,27 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
    
    `fasta2twoline.py contigs.fasta > twoline_contigs.fasta`
 
+## Making a blob-plot of contigs
+The above steps 8 and 9 can be applied to assembled contigs/scaffolds, however, it may be conceptually easier to generate a blob-plot to view the contigs and/or contamination directly.
+
+![twilhelma_2014_vs_scaffolds_v1.coverage.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/twilhelma_2014_vs_scaffolds_v1.coverage.png)
+
+1. Map reads with a normal read mapper, like [hisat2](http://ccb.jhu.edu/software/hisat2/index.shtml). Convert `.sam` file to a sorted `.bam`, using [samtools](https://github.com/samtools/samtools/releases)
+
+    `~/samtools-1.8/samtools view -Su twilhelma_2014_vs_scaffolds_v1.sam | ~/samtools-1.8/samtools sort - -o twilhelma_2014_vs_scaffolds_v1.sorted.bam`
+
+2. Extract the counts using the `sort_reads_from_bam.py` script.
+
+    `~/samtools-1.8/samtools view twilhelma_2014_vs_scaffolds_v1.sorted.bam | ~/git/lavaLampPlot/sort_reads_from_bam.py -i - > twilhelma_2014_vs_scaffolds_v1.sorted.hits_from_bam.txt`
+
+3. Compile the coverage, length, and GC content using the `hits_to_coverage.py` script.
+
+    `~/git/lavaLampPlot/hits_to_coverage.py -f twilhelma_scaffolds_v1.fasta -b twilhelma_2014_vs_scaffolds_v1.sorted.hits_from_bam.txt > twilhelma_2014_vs_scaffolds_v1.coverage.tab`
+
+4. Generate the plot with the R script `contig_gc_coverage.R`, which will automatically name the output file as `.pdf`.
+
+    `Rscript ~/git/lavaLampPlot/contig_gc_coverage.R twilhelma_2014_vs_scaffolds_v1.coverage.tab`
+
 ## Usage considerations
 #### Choosing k-mer length
 Due to the connection between kmer length and coverage, there is necessarily a balance between longer kmers, which will resolve the y-axis better, and higher coverage, which will resolve the x-axis better. Kmers between 31 and 41 tend to perform fairly well.
@@ -110,7 +131,7 @@ The previous version of Trinity mode in kmersorter had a problem with the SRA he
 This may no longer be a problem since `sort` is no longer called in the Trinity mode for kmersorter. This program was removed since the purpose was to organize the reads in a pair so they could be merged. The merging caused problems for extraction because the merge takes the average of the two coverage medians in a pair, so read coverage of 1 and 99 in a pair would make 50. This does not generate a count on the lava lamp plot, since the stats are counted separately in `fastqdumps2histo.py`. However, during extraction of regions in kmersorter, additional/junk reads outside of the defined extraction boundary were collected when neither read was in the defined region.
 
 ## Troubleshooting
-Two problems have come up a few times, and sample plots are shown in the error_plots folder. For the case of [Acropora](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/acropora_digitifera_15kb-MP_DRR001432_18Gb_k31_reads_u1000.pdf), there is a strip at the bottom. This was caused by the sequence in the read spanning multiple lines per read, instead of just one. For this situation, convert the reads to two-line fasta with the `fasta2twoline.py` script. For the other case of [Aiptasia](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/aiptasia_pallida_550bp-PE_SRR1648349_11Gb_k31_reads_u1000.pdf), the plot is distorted since the reads were trimmed and are not the same length. To solve this, use the `-p` option in `fastqdumps2histo.py` to calculate the length and GC for each sequence.
+Two problems have come up a few times, and sample plots are shown in the [error_plots folder](https://github.com/wrf/lavaLampPlot/tree/master/error_plots). For the case of [Acropora](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/acropora_digitifera_15kb-MP_DRR001432_18Gb_k31_reads_u1000.pdf), there is a strip at the bottom. This was caused by the sequence in the read spanning multiple lines per read, instead of just one. For this situation, convert the reads to two-line fasta with the `fasta2twoline.py` script. For the other case of [Aiptasia](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/aiptasia_pallida_550bp-PE_SRR1648349_11Gb_k31_reads_u1000.pdf), the plot is distorted since the reads were trimmed and are not the same length. To solve this, use the `-p` option in `fastqdumps2histo.py` to calculate the length and GC for each sequence.
 
 ## Misc
 As this is not really published work, citing is probably not necessary. Nonetheless, it may be advisable to say that any figures were created using this repo, something like "used lavaLampPlot python and R scripts by WRF".
