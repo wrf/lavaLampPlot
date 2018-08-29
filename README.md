@@ -28,7 +28,11 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
   
    `gzip -dc *.fastq.gz | jellyfish count -m 31 -s 2G -C -o fastq.counts -U 1000 -t 8 /dev/fd/0`
   
-   `-s` is the memory buffer, 2G (2 billion, or 2000000000) is safe for many analyses, though the array will expand if it is maxed out. This can consume a lot of memory (30-50Gb), so it is not advisable to run on a laptop. `-U` is the max coverage to count. 1000 will catch mostly transposons. `-t` is the thread count / number of CPUs. `-C` refers to canonical counting, meaning both + and - strands. 
+   * `-s` is the memory buffer, 2G (2 billion, or 2000000000) is safe for many analyses, though the array will expand if it is maxed out. This can consume a lot of memory (30-50Gb), so it is not advisable to run on a laptop.
+   * `-U` is the max coverage to count. 1000 will catch mostly transposons.
+   * `-t` is the thread count / number of CPUs.
+   * `-C` refers to canonical counting, meaning both + and - strands.
+   * `-m` is the kmer size. If downstream steps involving Trinity will be used (Step 4 and after) then do not select a kmer greater than 32, as this is the upper limit for the `fastaToKmerCoverageStats` program.
 
    Optionally, a lower limit can be set with `-L`. For generating kmer plots (step 3 below) this would affect the data and not be advised, but for the read plots (steps 4 and 5), the Trinity program `fastaToKmerCoverageStats` assumes that any values below 2 are 1. Since the bulk of the kmers have a count of 1 (66% in the *Hydra* sample), this makes a much smaller file and will run faster at subsequent steps.
 
@@ -103,7 +107,7 @@ The above steps 8 and 9 can be applied to assembled contigs/scaffolds, however, 
 
 ## Usage considerations
 #### Choosing k-mer length
-Due to the connection between kmer length and coverage, there is necessarily a balance between longer kmers, which will resolve the y-axis better, and higher coverage, which will resolve the x-axis better. Kmers between 31 and 41 tend to perform fairly well.
+Due to the connection between kmer length and coverage, there is necessarily a balance between longer kmers, which will resolve the y-axis better, and higher coverage, which will resolve the x-axis better. Kmers between 31 and 41 tend to perform fairly well. Because the Trinity steps cannot use a kmer larger than 32, setting the kmer to 31 is advisable (odd numbers are preferable to prevent double counting from palindromic sequences).
 
 #### Sequencing depth
 Sequencing coverage is also important. Environmental metagenomes (not amplicon sequencing) of fairly low coverage (5 gigbases) did not display any useful complexity. For metazoan genomes of 100-200Mb, around 20-30Gb of sequence data usually produced high quality plots displaying blobs for both animal and potential bacterial symbionts (see the example plot of *Hydra*, using one SRA of 25Gb of raw sequence).
@@ -124,7 +128,7 @@ The merging generates counts that are slightly different from counting them as a
 The manual from jellyfish v1 implies that if the output file is not specified with `-o`, jellyfish should create an extra output file with the default name ("output_") when the hash size is full. I have not tested if this works for sparing memory usage.
 
 #### SRA Files
-The previous version of Trinity mode in kmersorter had a problem with the SRA headers generated from the [SRA Toolkit](http://www.ncbi.nlm.nih.gov/books/NBK158900/) fastq-dump (due to problems in the called Trinity scripts). The stats file generation would work normally, but then the stats cannot be sorted correctly and ultimately the process will fail merging the stats. Brian Haas suggested this alternate command to generate the header (which one would also use during Trinity normalization).
+The previous version of Trinity mode in kmersorter had a problem with the SRA headers generated from the [SRA Toolkit](http://www.ncbi.nlm.nih.gov/books/NBK158900/) fastq-dump (due to problems in the called Trinity scripts). The stats file generation would work normally, but then the stats cannot be sorted correctly and ultimately the process will fail merging the stats. Brian Haas suggested [this alternate command](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Trinity-FAQ#ques_sra_fq_conversion) to generate the header (which one would also use during Trinity normalization).
 
 `fastq-dump --split-files --defline-seq '@$sn[_$rn]/$ri' SRR1032106.sra`
 
@@ -133,5 +137,7 @@ This may no longer be a problem since `sort` is no longer called in the Trinity 
 ## Troubleshooting
 Two problems have come up a few times, and sample plots are shown in the [error_plots folder](https://github.com/wrf/lavaLampPlot/tree/master/error_plots). For the case of [Acropora](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/acropora_digitifera_15kb-MP_DRR001432_18Gb_k31_reads_u1000.pdf), there is a strip at the bottom. This was caused by the sequence in the read spanning multiple lines per read, instead of just one. For this situation, convert the reads to two-line fasta with the `fasta2twoline.py` script. For the other case of [Aiptasia](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/aiptasia_pallida_550bp-PE_SRR1648349_11Gb_k31_reads_u1000.pdf), the plot is distorted since the reads were trimmed and are not the same length. To solve this, use the `-p` option in `fastqdumps2histo.py` to calculate the length and GC for each sequence.
 
-## Misc
-As this is not really published work, citing is probably not necessary. Nonetheless, it may be advisable to say that any figures were created using this repo, something like "used lavaLampPlot python and R scripts by WRF".
+## Citation
+This tool was used in the analysis of the [*Hoilungia hongkongensis* genome](https://bitbucket.org/molpalmuc/hoilungia-genome/src/master/) ([Figure S2](https://doi.org/10.1371/journal.pbio.2005359.s002)). It is unlikely I will make a dedicated paper, so if these scripts are used, please cite the paper:
+
+Eitel, M., Francis, W.R., Varoqueaux, F., Daraspe, J., Osigus, H-J., Krebs, S., Vargas, S., Blum, H., Williams, G.A., Schierwater, B., Wörheide, G. (2018) [Comparative genomics and the nature of placozoan species](https://doi.org/10.1371/journal.pbio.2005359). PLoS Biology 16(7):e2005359.
