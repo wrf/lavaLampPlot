@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 '''
-kmersorter.py v1.2 2015-05-27
+kmersorter.py v1.2 2018-08-29
 # take jellyfish kmer dumps and sort by coverage
 
   1) using the compressed reads, count the kmers
@@ -108,7 +108,7 @@ def convert_to_fasta(fastool_path, reads):
 	if os.path.isfile(fasta_reads):
 		print >> sys.stderr, "# Reads already converted, skipping...", time.asctime()
 	else:
-		fastool_args = [fastool_path, "--illumina-trinity", "--to-fasta", reads]
+		fastool_args = [fastool_path, "-I", reads]
 		with open(fasta_reads, 'a') as fr:
 			subprocess.call(fastool_args, stdout=fr)
 	return fasta_reads
@@ -288,7 +288,7 @@ def main(argv, wayout):
 
 		# check if all programs are there
 		print >> sys.stderr, "### Checking for sub programs", time.asctime()
-		fastool_path = os.path.join(trinity_dir, "trinity-plugins/fastool/fastool")
+		fastool_path = os.path.join(trinity_dir, "util/support_scripts/fastQ_to_fastA.pl")
 		kmertocov_path = os.path.join(trinity_dir, "Inchworm/bin/fastaToKmerCoverageStats")
 		allProgsFound = True
 		for prog in [fastool_path, kmertocov_path]:
