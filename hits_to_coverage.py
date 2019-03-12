@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-'''hits_to_coverage.py  last modified 2018-08-30
+'''hits_to_coverage.py  last modified 2019-03-11
 
     combine number of reads mapped to each contig with
     length and GC content, to make a tabular output as:
@@ -39,6 +39,7 @@ def main(argv, wayout):
 
 	seqcounter = 0
 	keptcounter = 0
+	baseremoval = 0
 	print >> sys.stderr, "# Reading contigs from {}".format(args.fasta)
 	print >> sys.stdout, "scaffold\tnumber\tlength\tcoverage\tGC\tgaps"
 	for seqrec in SeqIO.parse(args.fasta,"fasta"):
@@ -48,10 +49,14 @@ def main(argv, wayout):
 		gc = (seqrec.seq.count("G")+seqrec.seq.count("C")) * 100.0 / ( len(seqrec.seq) - gaps )
 		coverage = int(args.read_length * hitdict.get(seqrec.id,0) / seqlength)
 		if coverage <= args.above or coverage > args.below or gc < args.strong or gc > args.weak:
+			print >> sys.stderr, "# IGNORING {}: len={} GC={:.2f} COVERAGE={:.2f}".format( seqrec.id, seqlength, gc, coverage )
+			baseremoval += seqlength
 			continue
 		keptcounter += 1
 		print >> sys.stdout, "{}\t{}\t{}\t{}\t{}\t{}".format( seqrec.id, seqcounter, seqlength, coverage, gc, gaps )
 	print >> sys.stderr, "# Counted {} sequences, kept {}".format( seqcounter, keptcounter )
+	if baseremoval:
+		print >> sys.stderr, "# Removed {} sequences, totaling {} bases".format( seqcounter-keptcounter, baseremoval )
 
 if __name__ == "__main__":
 	main(sys.argv[1:],sys.stdout)
