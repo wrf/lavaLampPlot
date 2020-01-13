@@ -1,12 +1,18 @@
 # contig gc coverage  last modified 2018-08-29
 # output should be tab-delimited as as:
 # contigname  contignumber  length  coverage  GC  gaps
+# this is the output from hits_to_coverage.py and spadescontigstocovgc.py
 
 args = commandArgs(trailingOnly=TRUE)
 
 inputfile = args[1]
 #inputfile = "~/genomes/tethya_wilhelma-genome/twilhelma_v2_dovetail/twilhelma_2014_dna_vs_dovetail_coverage.tab"
 outputfile = gsub("([\\w/]+)\\....$","\\1.pdf",inputfile,perl=TRUE)
+
+if (inputfile==outputfile) { stop("cannot parse input file to generate output file name, add a unique 3-letter suffix") }
+
+print(paste0("Reading ",inputfile,", writing to ",outputfile))
+print("expecting input as:  contigname  contignumber  length  coverage  GC  gaps")
 
 coveragedata = read.table(inputfile, header=TRUE, sep='\t')
 
@@ -33,8 +39,8 @@ totalsize = sum(contiglengths)
 
 gc = coveragedata[["GC"]]
 highgc = gc > 50
-sum(contiglengths[highgc])
-sum(contiglengths[!highgc])
+print( paste(sum(contiglengths[highgc]),"bases of GC > 50%") )
+print( paste(sum(contiglengths[!highgc]),"bases of GC <= 50%") )
 
 # default is green
 pointcolor = rep("#39bc6744", length(names))
