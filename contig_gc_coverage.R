@@ -6,7 +6,7 @@
 args = commandArgs(trailingOnly=TRUE)
 
 inputfile = args[1]
-#inputfile = "~/genomes/tethya_wilhelma-genome/twilhelma_v2_dovetail/twilhelma_2014_dna_vs_dovetail_coverage.tab"
+#inputfile = "~/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib001_final_assembly.coverage_gc.tab"
 outputfile = gsub("([\\w/]+)\\....$","\\1.pdf",inputfile,perl=TRUE)
 
 if (inputfile==outputfile) { stop("cannot parse input file to generate output file name, add a unique 3-letter suffix") }
@@ -25,6 +25,7 @@ covmax = 1000
 }
 
 gcmax = 80
+gcmin = 20
 
 contiglengths = coveragedata[["length"]]
 magnituderange = range(log(contiglengths,base=10))
@@ -37,10 +38,26 @@ legendpch = legendsizes - magnituderange[1]
 
 totalsize = sum(contiglengths)
 
+# print GC stats to user
 gc = coveragedata[["GC"]]
 highgc = gc > 50
-print( paste(sum(contiglengths[highgc]),"bases of GC > 50%") )
-print( paste(sum(contiglengths[!highgc]),"bases of GC <= 50%") )
+print( paste(sum(highgc), "scaffolds of GC > 50%, for", sum(contiglengths[highgc]),"bases") )
+print( paste(  sum(contiglengths[!highgc]),"bases of GC <= 50%") )
+lowgc = gc < 10
+print( paste(sum(lowgc), "scaffolds of GC < 10%, for", sum(contiglengths[lowgc]),"bases") )
+
+
+# adjust min and max of GC scale, in case scaffolds go beyond
+if (min(gc) < 20) {
+	print( paste("lowest GC is", min(gc), ": setting minimum on graph") )
+	gcmin = min(gc)
+}
+
+if (max(gc) > 80) {
+	print( paste("highest GC is", max(gc), ": setting maximum on graph") )
+	gcmin = max(gc)
+}
+
 
 # default is green
 pointcolor = rep("#39bc6744", length(names))
@@ -51,13 +68,16 @@ pointcolor[longcontigs] = "#386edc66"
 # longest contigs are magenta
 pointcolor[massivecontigs] = "#d51ea477"
 
+# make GC range
+gcspan = gcmax - gcmin
+
 # generate figure
 pdf(file=outputfile, width=8, height=7)
 par(mar=c(4.5,4.5,3,1))
-plot(coveragedata[["coverage"]], coveragedata[["GC"]], type='p', xlim=c(0,covmax), ylim=c(20,gcmax), xlab="Mean coverage of mapped reads", ylab="GC%", pch=16, frame.plot=FALSE, col=pointcolor, cex.axis=1.5, cex=pchsize, main=inputfile, cex.lab=1.4)
+plot(coveragedata[["coverage"]], coveragedata[["GC"]], type='p', xlim=c(0,covmax), ylim=c(gcmin,gcmax), xlab="Mean coverage of mapped reads", ylab="GC%", pch=16, frame.plot=FALSE, col=pointcolor, cex.axis=1.5, cex=pchsize, main=inputfile, cex.lab=1.4)
 legend(covmax,gcmax, legend=legendlabels, pch=16, col=c("#39bc6799","#386edc99","#d51ea499"), pt.cex=legendpch, cex=1.1, title="Contig size (bp)", xjust=1)
-text(covmax,23,paste(round(totalsize/1000000,digits=1),"Mb"), cex=1.2, pos=2)
-text(covmax,20,paste(length(names),"total contigs"), cex=1.2, pos=2)
+text(covmax, gcmin + 0.05*gcspan, paste(round(totalsize/1000000,digits=1),"Mb"), cex=1.2, pos=2)
+text(covmax, gcmin, paste(length(names),"total contigs"), cex=1.2, pos=2)
 dev.off()
 
 
