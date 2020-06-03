@@ -10,7 +10,7 @@ Below is an example plot from *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.
 
 ![hydra_vulgaris_SRR1032106_k31_u300_reads.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/hydra_vulgaris_SRR1032106_k31_u300_reads.png)
 
-This is conceptually similar to what is done in the "blob" plots by [blobtools](https://drl.github.io/blobtools/), (paper by [Kumar et al 2013](https://doi.org/10.3389/fgene.2013.00237)) though that process makes use of assembled contigs while this one considers the raw reads directly.
+This is conceptually similar to what is done in the "blob" plots by [blobtools](https://github.com/DRL/blobtools), (paper by [Kumar et al 2013](https://doi.org/10.3389/fgene.2013.00237)) though that process makes use of assembled contigs while this one considers the raw reads directly.
 
 ## Dependencies
 Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) (or another preferred kmer counter). If you are using [Trinity for transcriptome assembly](https://github.com/trinityrnaseq/trinityrnaseq/wiki), then you already have it since the jellyfish binary is supplied with Trinity in the `trinity-plugins/` folder.
