@@ -1,4 +1,4 @@
-# contig gc coverage  last modified 2018-08-29
+# contig gc coverage  last modified 2020-06-03
 # output should be tab-delimited as as:
 # contigname  contignumber  length  coverage  GC  gaps
 # this is the output from hits_to_coverage.py and spadescontigstocovgc.py
@@ -55,7 +55,7 @@ if (min(gc) < 20) {
 
 if (max(gc) > 80) {
 	print( paste("highest GC is", max(gc), ": setting maximum on graph") )
-	gcmin = max(gc)
+	gcmax = max(gc)
 }
 
 
