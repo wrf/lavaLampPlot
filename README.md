@@ -105,6 +105,11 @@ The above steps 8 and 9 can be applied to assembled contigs/scaffolds, however, 
 
     `Rscript ~/git/lavaLampPlot/contig_gc_coverage.R twilhelma_2014_vs_scaffolds_v1.coverage.tab`
 
+## ShinyApp test ##
+This is the first attempt to convert the plotting into an interactive [ShinyApp](https://shiny.rstudio.com/tutorial/), with 3 slide bars to control what scaffolds are shown. Here, using the example data from [Ephydatia muelleri](https://spaces.facsci.ualberta.ca/ephybase/), the pink spot on the left shows a low-coverage bacterial partial-chromosome. Mouse-clicks displays the stats for that scaffold, and others nearby, below the plot.
+
+![blobplot_screenshot_Emuelleri.png](https://github.com/wrf/lavaLampPlot/blob/master/Rshiny/blobplot_screenshot_Emuelleri.png)
+
 ## Usage considerations
 #### Choosing k-mer length
 Due to the connection between kmer length and coverage, there is necessarily a balance between longer kmers, which will resolve the y-axis better, and higher coverage, which will resolve the x-axis better. Kmers between 31 and 41 tend to perform fairly well. Because the Trinity steps cannot use a kmer larger than 32, setting the kmer to 31 is advisable (odd numbers are preferable to prevent double counting from palindromic sequences).
