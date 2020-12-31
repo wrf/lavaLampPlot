@@ -1,5 +1,5 @@
 # plot jellyfish kmer coverage vs gc content in lava lamp form
-# v2 last modified 2016-06-23
+# v2 last modified 2020-12-29
 
 # this script was generated using R version 3.1.3
 # generate csv matrix of outputs using fastqdumps2histo.py
@@ -67,9 +67,13 @@ m2 = log(m1, base=2)
 # use this for log base 2
 # first function generates color scale of 1000 colors from white to purple, then purple to red
 colorcount = 1000
-# 10 percent of the colors are for white to pink, the rest through the rainbow
+# 16 percent of the colors are for white to pink, the rest through the rainbow
 white2pink = colorcount*0.166
 pink2red = colorcount*0.834
+
+# example monochromatic colorset
+#colorset = c(colorRampPalette(c("#DDDDFF","#5893db"))(white2pink), colorRampPalette(c("#5893db","#000000"))(pink2red) )
+# standard rainbow colorset
 colorset = c(colorRampPalette(c("#FFDDDD","#CC006E"),alpha=0.9)(white2pink), rainbow(pink2red, start=0.91, end=0.89, v=0.8, alpha=0.9) )
 
 # zmax should therefore be either the max of m1 or the defined zmax, whichever is lower
@@ -86,7 +90,7 @@ zmax = truezmax
 pdf(file=outfilename, width=10, heigh=8)
 
 # this becomes the main chart label
-mainlab = paste(kmer,"mer coverage vs GC",sep="")
+mainlab = paste0(kmer,"mer coverage vs GC in ",f1)
 
 if(withscale==TRUE){
 	# this generates a 2 column figure with a narrow scalebar on the right side
@@ -98,10 +102,12 @@ if(withscale==TRUE){
 	par(mar=c(4,4,4,4))
 }
 # image() actually generates the heatmap
-image(x=1:ncol(m2), y=1:nrow(m2), z=t(m2), col=colorset, xlab="Coverage", ylab="GC%", axes=FALSE, main=mainlab )
-axis(1, at=pretty(c(0,ymax)), labels=pretty(c(0,ymax)) )
+image(x=1:ncol(m2), y=1:nrow(m2), z=t(m2), col=colorset, xlab="", ylab="", axes=FALSE, main=mainlab )
+mtext("Coverage", side=1, line=2.5, cex=1.4)
+mtext("GC%", side=2, line=2.5, cex=1.4)
+axis(1, at=pretty(c(0,ymax)), labels=pretty(c(0,ymax)), cex.axis=1.4 )
 # because 0 is a position, all other positions have to be corrected
-axis(2, at=gcpositions+1, labels=gclabels )
+axis(2, at=gcpositions+1, labels=gclabels, cex.axis=1.4 )
 
 # for text overlay
 textcol="white"
