@@ -13,7 +13,7 @@ Below is an example plot from *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.
 This is conceptually similar to what is done in the "blob" plots by [blobtools](https://github.com/DRL/blobtools), (paper by [Kumar et al 2013](https://doi.org/10.3389/fgene.2013.00237)) though that process makes use of assembled contigs while this one considers the raw reads directly.
 
 ## Dependencies
-Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) (or another preferred kmer counter). If you are using [Trinity for transcriptome assembly](https://github.com/trinityrnaseq/trinityrnaseq/wiki), then you already have it since the jellyfish binary is supplied with Trinity in the `trinity-plugins/` folder.
+Download the [jellyfish kmer counter](https://github.com/gmarcais/Jellyfish) (or another preferred kmer counter). If you are using [Trinity for transcriptome assembly](https://github.com/trinityrnaseq/trinityrnaseq/wiki), then you already have it since the jellyfish binary is supplied with Trinity in the `trinity-plugins/` folder.
 
 ## Operation
 1. Run jellyfish on the raw genomic data, i.e. paired end reads.
@@ -85,7 +85,7 @@ Download the [jellyfish kmer counter](http://www.genome.umd.edu/jellyfish.html) 
    `fasta2twoline.py contigs.fasta > twoline_contigs.fasta`
 
 ## Making a blob-plot of contigs
-The above steps 8 and 9 can be applied to assembled contigs/scaffolds, however, it may be conceptually easier to generate a blob-plot to view the contigs and/or contamination directly.
+The above steps 8 and 9 can be applied to assembled contigs/scaffolds, however, it may be conceptually easier to generate something like a [blob-plot](https://github.com/DRL/blobtools) to view the contigs and/or contamination directly.
 
 ![twilhelma_2014_vs_scaffolds_v1.coverage.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/twilhelma_2014_vs_scaffolds_v1.coverage.png)
 
@@ -104,6 +104,9 @@ The above steps 8 and 9 can be applied to assembled contigs/scaffolds, however, 
 4. Generate the plot with the R script `contig_gc_coverage.R`, which will automatically name the output file as `.pdf`.
 
     `Rscript ~/git/lavaLampPlot/contig_gc_coverage.R twilhelma_2014_vs_scaffolds_v1.coverage.tab`
+
+### As a direct output of some assemblers
+Some assemblers report the contig coverage directly within the fasta header, such as [SPAdes](https://github.com/ablab/spades). Another [script](https://bitbucket.org/wrf/sequences/src/master/spadescontigstocovgc.py) can convert this directly into a compatible table.
 
 ## ShinyApp test ##
 This is the first attempt to convert the plotting into an interactive [ShinyApp](https://shiny.rstudio.com/tutorial/), with 3 slide bars to control what scaffolds are shown. Here, using the example data from [Ephydatia muelleri](https://spaces.facsci.ualberta.ca/ephybase/), the pink spot on the left shows a low-coverage bacterial partial-chromosome. Mouse-clicks displays the stats for that scaffold, and others nearby, below the plot.
