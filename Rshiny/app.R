@@ -1,9 +1,11 @@
-#
+# make interactive plot of contigs in genomes or metagenomes
+# last modified 2020-12-31
 
 library(shiny)
 
 #coveragefile = "~/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib002_final_assembly.coverage_gc.tab"
-coveragefile = "~/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib002_final_assembly.coverage_gc.tab"
+coveragefile = "~/project/climate_lake_metagenome/climate_lake1_scaffolds.stats.tab"
+
 
 coveragedata = read.table(coveragefile, header=TRUE, sep='\t')
 contiglengths = coveragedata[["length"]]
@@ -16,9 +18,9 @@ contignames = coveragedata[,1]
 pointcolor = rep("#39bc6744", length(contignames))
 longcontigs = contiglengths > 100000
 massivecontigs = contiglengths > 1000000
-# midsize is blue
+# midsize is blue, must be 100kb
 pointcolor[longcontigs] = "#386edc66"
-# longest contigs are magenta
+# longest contigs are magenta, must be over 1Mb
 pointcolor[massivecontigs] = "#d51ea477"
 
 
@@ -33,8 +35,6 @@ ui <- fluidPage(
     
     # Sidebar panel for inputs ----
     sidebarPanel(
-    #  helpText("Each point is a contig"),
-    
       sliderInput(inputId = "gc",
             label = "GC %",
             min = 0,
@@ -52,17 +52,19 @@ ui <- fluidPage(
                   label = "Contig size (log bp)",
                   min = 0,
                   max = 9,
-                  value = c(1,8),
+                  value = c(3,8),
                   step = 1
       )
     ),
     # Main panel for displaying outputs ----
     mainPanel( 
-      h3("Each point is a contig. Click on a point to display stats"),
+      h3("Each point is a contig. Click-and-drag to display stats"),
       strong( paste("Using", basename(coveragefile) ) ),
       plotOutput(outputId = "distPlot",
                  height="600px",
-                 click = "plot_click"),
+                 click = "plot_click",
+                 brush = brushOpts(id = "plot_brush")
+                 ),
       tableOutput("info")
       )
    )
@@ -78,29 +80,28 @@ server <- function(input, output) {
          xlim=input$cov, ylim=input$gc, 
          xlab="Mean coverage of mapped reads", ylab="GC%", 
          pch=16, frame.plot=FALSE, col=pointcolor[datarange], cex.axis=1.5, cex=pchsize[datarange], main="", cex.lab=1.4)
-   # legend(covmax,gcmax, legend=legendlabels, pch=16, col=c("#39bc6799","#386edc99","#d51ea499"), pt.cex=legendpch, cex=1.1, title="Contig size (bp)", xjust=1)
+    # display overview stats on top left of graph
+    all_contig_total = sum(coveragedata[["length"]])
+    text(min(input$cov), max(input$gc), paste(dim(coveragedata)[1], "contigs", round(all_contig_total/1000000,digits=1),"Mb total"), pos=4, cex=1.2)
+    # display selected contigs on bottom right of graph
+    sub_table = brushedPoints(coveragedata, input$plot_brush, xvar = "coverage", yvar = "GC")
+    sub_size_total = sum(sub_table[["length"]])
+    text(max(input$cov), min(input$gc), paste(dim(sub_table)[1], "contigs", round(sub_size_total/1000000,digits=1),"Mb selected"), pos=2, cex=1.2)
+  # leftover code from original script
+  # legend(covmax,gcmax, legend=legendlabels, pch=16, col=c("#39bc6799","#386edc99","#d51ea499"), pt.cex=legendpch, cex=1.1, title="Contig size (bp)", xjust=1)
   #  text(covmax,23,paste(round(totalsize/1000000,digits=1),"Mb"), cex=1.2, pos=2)
   #  text(covmax,20,paste(length(contignames),"total contigs"), cex=1.2, pos=2)
   })
   output$info <- renderTable({
-    # With base graphics, need to tell it what the x and y variables are.
-    nearPoints(coveragedata, input$plot_click, xvar = "coverage", yvar = "GC")
-    # nearPoints() also works with hover and dblclick events
+    brushedPoints(coveragedata, input$plot_brush, xvar = "coverage", yvar = "GC")
+    # previous version, where points were clicked
+    #nearPoints(coveragedata, input$plot_click, xvar = "coverage", yvar = "GC")
   })
   
 }
 
 # Create Shiny app ----
 shinyApp(ui = ui, server = server)
-
-
-
-
-
-
-
-
-
 
 
 
