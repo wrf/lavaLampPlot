@@ -4,7 +4,7 @@
 library(shiny)
 
 #coveragefile = "~/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib002_final_assembly.coverage_gc.tab"
-coveragefile = "~/project/climate_lake_metagenome/climate_lake1_scaffolds.stats.tab"
+coveragefile = "~/project/climate_lake_metagenome/climate_lake1_scaffolds.stats.w_genus.tab"
 
 
 coveragedata = read.table(coveragefile, header=TRUE, sep='\t')
@@ -46,7 +46,7 @@ ui <- fluidPage(
             min = 0,
             max = 2500,
             value = c(0,1000),
-            step = 100
+            step = 10
       ),
       sliderInput(inputId = "length",
                   label = "Contig size (log bp)",
@@ -54,7 +54,11 @@ ui <- fluidPage(
                   max = 9,
                   value = c(3,8),
                   step = 1
-      )
+      ),
+      radioButtons("cov_mode", h3("Coverage axis mode"),
+                   choices = list("Linear" = 1, "Logarithmic" = 2),
+                   selected = 1
+                   )
     ),
     # Main panel for displaying outputs ----
     mainPanel( 
@@ -74,10 +78,20 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   output$distPlot <- renderPlot({
+    
+    axis_mode = ""
+    coverage_range = input$cov
+    if (input$cov_mode == 2){
+      axis_mode = "x"
+      if ( input$cov[1]==0 ){
+        coverage_range = c(1, input$cov[2] )
+      }
+    }
+
     datarange = input$length[1] <= log10(contiglengths) & log10(contiglengths) <= input$length[2]
     par(mar=c(4.5,4.5,3,1))
     plot(coveragedata[["coverage"]][datarange], coveragedata[["GC"]][datarange], type='p', 
-         xlim=input$cov, ylim=input$gc, 
+         xlim=coverage_range, ylim=input$gc, log=axis_mode,
          xlab="Mean coverage of mapped reads", ylab="GC%", 
          pch=16, frame.plot=FALSE, col=pointcolor[datarange], cex.axis=1.5, cex=pchsize[datarange], main="", cex.lab=1.4)
     # display overview stats on top left of graph
