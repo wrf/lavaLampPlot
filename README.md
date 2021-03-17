@@ -1,5 +1,18 @@
-# lavaLampPlot
-instructions, python and R code for generating lava lamp plots of kmer coverage as the kmers themselves, or based on the raw reads.
+# lavaLampPlot #
+Instructions, python and R code for generating lava lamp plots of kmer coverage as the kmers themselves, or based on the raw reads.
+
+This tool was used in the analysis of the [*Hoilungia hongkongensis* genome](https://bitbucket.org/molpalmuc/hoilungia-genome/src/master/) ([Figure S2](https://doi.org/10.1371/journal.pbio.2005359.s002)). It is unlikely I will make a dedicated paper, so if these scripts are used, please cite the paper:
+
+Eitel, M., Francis, W.R., Varoqueaux, F., Daraspe, J., Osigus, H-J., Krebs, S., Vargas, S., Blum, H., Williams, G.A., Schierwater, B., Wörheide, G. (2018) [Comparative genomics and the nature of placozoan species](https://doi.org/10.1371/journal.pbio.2005359). PLoS Biology 16(7):e2005359.
+
+### Contents: ###
+
+* [Dependencies](https://github.com/wrf/lavaLampPlot#dependencies)
+* [Operation](https://github.com/wrf/lavaLampPlot#operation)
+* [Blob plots](https://github.com/wrf/lavaLampPlot#making-a-blob-plot-of-contigs)
+* [Shiny app](https://github.com/wrf/lavaLampPlot#shinyapp-test)
+* [Usage tips](https://github.com/wrf/lavaLampPlot#usage-considerations)
+* [Troubleshooting](https://github.com/wrf/lavaLampPlot#troubleshooting)
 
 ## Overview
 This includes a few scripts to generate a "lava lamp" plot of kmer coverage separated by GC content of the kmers. This is a heat-map of frequency of reads or kmers with a particular coverage and GC content, giving a sense of the coverage of the target species and any symbionts or contaminants.
@@ -10,10 +23,18 @@ Below is an example plot from *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.
 
 ![hydra_vulgaris_SRR1032106_k31_u300_reads.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/hydra_vulgaris_SRR1032106_k31_u300_reads.png)
 
-This is conceptually similar to what is done in the "blob" plots by [blobtools](https://github.com/DRL/blobtools), (paper by [Kumar et al 2013](https://doi.org/10.3389/fgene.2013.00237)) though that process makes use of assembled contigs while this one considers the raw reads directly.
+This is conceptually similar to what is done in the "blob" plots by [blobtools](https://github.com/DRL/blobtools), (paper by [Kumar et al 2013](https://doi.org/10.3389/fgene.2013.00237)) though that process makes use of assembled contigs while this one considers the raw reads directly. However, instructions for generating such plots are also [below](https://github.com/wrf/lavaLampPlot#making-a-blob-plot-of-contigs). Some assemblers output contig coverage information with the contigs, and these can be used [without mapping the reads](https://github.com/wrf/lavaLampPlot#as-a-direct-output-of-some-assemblers).
+
+When making such plots for metagenomics, be aware of the implications of contig coverage for many potential analyses. The coverage only refers to the relative number of copies of contigs or chromosomes. For something like a bacterial sample, this would generally be relative counts of cells.
+
+![metagenome_gc_cov_schematic_v2.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/metagenome_gc_cov_schematic_v2.png)
+
+Mapping the reads back to the same contigs should make a mostly even coverage, but the total counts per gene or per contig will vary by the length, and must be normalized in order to be meaningful. For example, if two bacterial species had equal abundance, but one has a genome 2x larger than the other, this will account for 2x the number of reads, even if the coverage is the same. This means longer genes, contigs, or chromosomes will have more counts, but also means that homologous operons between species will vary by both coverage and length. In such cases, the contig coverage could be simplistically applied to the operon, but it may be better to quantify the actual expression or protein activity instead.
+
+![metagenome_gc_cov_vs_read_counts_v1.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/metagenome_gc_cov_vs_read_counts_v1.png)
 
 ## Dependencies
-Download the [jellyfish kmer counter](https://github.com/gmarcais/Jellyfish) (or another preferred kmer counter). If you are using [Trinity for transcriptome assembly](https://github.com/trinityrnaseq/trinityrnaseq/wiki), then you already have it since the jellyfish binary is supplied with Trinity in the `trinity-plugins/` folder.
+Download the [jellyfish kmer counter](https://github.com/gmarcais/Jellyfish) (or another preferred kmer counter). This used to be supplied with [Trinity for transcriptome assembly](https://github.com/trinityrnaseq/trinityrnaseq/wiki), and was previously in the `trinity-plugins/` folder.
 
 ## Operation
 1. Run jellyfish on the raw genomic data, i.e. paired end reads.
@@ -145,7 +166,3 @@ This may no longer be a problem since `sort` is no longer called in the Trinity 
 ## Troubleshooting
 Two problems have come up a few times, and sample plots are shown in the [error_plots folder](https://github.com/wrf/lavaLampPlot/tree/master/error_plots). For the case of [Acropora](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/acropora_digitifera_15kb-MP_DRR001432_18Gb_k31_reads_u1000.pdf), there is a strip at the bottom. This was caused by the sequence in the read spanning multiple lines per read, instead of just one. For this situation, convert the reads to two-line fasta with the `fasta2twoline.py` script. For the other case of [Aiptasia](https://github.com/wrf/lavaLampPlot/blob/master/error_plots/aiptasia_pallida_550bp-PE_SRR1648349_11Gb_k31_reads_u1000.pdf), the plot is distorted since the reads were trimmed and are not the same length. To solve this, use the `-p` option in `fastqdumps2histo.py` to calculate the length and GC for each sequence.
 
-## Citation
-This tool was used in the analysis of the [*Hoilungia hongkongensis* genome](https://bitbucket.org/molpalmuc/hoilungia-genome/src/master/) ([Figure S2](https://doi.org/10.1371/journal.pbio.2005359.s002)). It is unlikely I will make a dedicated paper, so if these scripts are used, please cite the paper:
-
-Eitel, M., Francis, W.R., Varoqueaux, F., Daraspe, J., Osigus, H-J., Krebs, S., Vargas, S., Blum, H., Williams, G.A., Schierwater, B., Wörheide, G. (2018) [Comparative genomics and the nature of placozoan species](https://doi.org/10.1371/journal.pbio.2005359). PLoS Biology 16(7):e2005359.
