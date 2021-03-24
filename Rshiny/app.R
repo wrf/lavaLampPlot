@@ -55,10 +55,12 @@ ui <- fluidPage(
                   value = c(3,8),
                   step = 1
       ),
-      radioButtons("cov_mode", h3("Coverage axis mode"),
+      radioButtons("cov_mode", h4("Coverage axis mode"),
                    choices = list("Linear" = 1, "Logarithmic" = 2),
                    selected = 1
-                   )
+                   ),
+      h4("Render current graph as PDF"),
+      downloadButton("printpdf", label = "Print")
     ),
     # Main panel for displaying outputs ----
     mainPanel( 
@@ -106,12 +108,35 @@ server <- function(input, output) {
   #  text(covmax,23,paste(round(totalsize/1000000,digits=1),"Mb"), cex=1.2, pos=2)
   #  text(covmax,20,paste(length(contignames),"total contigs"), cex=1.2, pos=2)
   })
+  
   output$info <- renderTable({
     brushedPoints(coveragedata, input$plot_brush, xvar = "coverage", yvar = "GC")
     # previous version, where points were clicked
     #nearPoints(coveragedata, input$plot_click, xvar = "coverage", yvar = "GC")
   })
   
+  output$printpdf <- downloadHandler(
+    filename = function() {"plot.pdf"},
+    content = function(file) {
+      axis_mode = ""
+      coverage_range = input$cov
+      if (input$cov_mode == 2){
+        axis_mode = "x"
+        if ( input$cov[1]==0 ){
+          coverage_range = c(1, input$cov[2] )
+        }
+      }
+      datarange = input$length[1] <= log10(contiglengths) & log10(contiglengths) <= input$length[2]
+      pdf_title = paste0(input$cov[1],"-",input$cov[2],"cov_", input$gc[1], "-",input$gc[2], "gc", ".pdf")
+      pdf(file, width=7, height=6, title=pdf_title)
+      par(mar=c(4.5,4.5,3,1))
+      plot(coveragedata[["coverage"]][datarange], coveragedata[["GC"]][datarange], type='p', 
+           xlim=coverage_range, ylim=input$gc, log=axis_mode,
+           xlab="Mean coverage of mapped reads", ylab="GC%", 
+           pch=16, frame.plot=FALSE, col=pointcolor[datarange], cex.axis=1.5, cex=pchsize[datarange], main="", cex.lab=1.4)
+      dev.off()
+      }
+    )
 }
 
 # Create Shiny app ----
