@@ -1,5 +1,5 @@
 # lavaLampPlot #
-Instructions, python and R code for generating lava lamp plots of kmer coverage as the kmers themselves, or based on the raw reads.
+Instructions, python and R code for generating lava lamp plots of kmer coverage as the kmers themselves, or based on kmer-coverage averages on the raw reads.
 
 This tool was used in the analysis of the [*Hoilungia hongkongensis* genome](https://bitbucket.org/molpalmuc/hoilungia-genome/src/master/) ([Figure S2](https://doi.org/10.1371/journal.pbio.2005359.s002)). It is unlikely I will make a dedicated paper, so if these scripts are used, please cite the paper:
 
@@ -17,7 +17,7 @@ Eitel, M., Francis, W.R., Varoqueaux, F., Daraspe, J., Osigus, H-J., Krebs, S., 
 ## Overview
 This includes a few scripts to generate a "lava lamp" plot of kmer coverage separated by GC content of the kmers. This is a heat-map of frequency of reads or kmers with a particular coverage and GC content, giving a sense of the coverage of the target species and any symbionts or contaminants.
 
-Such plots are usually sufficient to reveal heterozygosity or the presence of symbionts with very different GC content than the host.
+Such plots were intended for use on metagenomic data ([whole-genome shotgun](https://www.ncbi.nlm.nih.gov/genbank/metagenome/), not amplicon), and can be generated with raw data, meaning that no assembly or other processing of the reads is needed. This is usually sufficient to reveal heterozygosity (for eukaryotes) or the presence of symbionts with very different GC content than the host, and instruct whether to even use the data or not. For instance, distinct "spots" suggest an good extraction, while a smear would suggest that there were some biases in the extraction or sequencing and that assembly may be highly problematic.
 
 Below is an example plot from *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.nih.gov/sra/SRX378887) using a kmer of 31. The putative symbiont is visible in the plot with a high GC content. The second plot counts based on GC of the full read and median coverage kmers in that read, rather than the kmers alone.
 
@@ -25,11 +25,17 @@ Below is an example plot from *Hydra vulgaris* [SRR1032106](http://www.ncbi.nlm.
 
 This is conceptually similar to what is done in the "blob" plots by [blobtools](https://github.com/DRL/blobtools), (paper by [Kumar et al 2013](https://doi.org/10.3389/fgene.2013.00237)) though that process makes use of assembled contigs while this one considers the raw reads directly. However, instructions for generating such plots are also [below](https://github.com/wrf/lavaLampPlot#making-a-blob-plot-of-contigs). Some assemblers output contig coverage information with the contigs, and these can be used [without mapping the reads](https://github.com/wrf/lavaLampPlot#as-a-direct-output-of-some-assemblers).
 
-When making such plots for metagenomics, be aware of the implications of contig coverage for many potential analyses. The coverage only refers to the relative number of copies of contigs or chromosomes. For something like a bacterial sample, this would generally be relative counts of cells.
+![hydra_dovetail_w_meta_SRR1032106.gc_cov.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/hydra_dovetail_w_meta_SRR1032106.gc_cov.png)
+
+When making such plots for metagenomics, be aware of the implications of contig coverage for many potential analyses. The coverage is calculated by reads per base, but for the blobs, should reflect the relative number of copies of contigs or chromosomes. For something like a bacterial sample, this could be considered to be a relative counts of cells.
 
 ![metagenome_gc_cov_schematic_v2.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/metagenome_gc_cov_schematic_v2.png)
 
-Mapping the reads back to the same contigs should make a mostly even coverage, but the total counts per gene or per contig will vary by the length, and must be normalized in order to be meaningful. For example, if two bacterial species had equal abundance, but one has a genome 2x larger than the other, this will account for 2x the number of reads, even if the coverage is the same. This means longer genes, contigs, or chromosomes will have more counts, but also means that homologous operons between species will vary by both coverage and length. In such cases, the contig coverage could be simplistically applied to the operon, but it may be better to quantify the actual expression or protein activity instead.
+Mapping the original reads back to the assembled contigs should make a mostly even coverage within each scaffold. The raw total counts per gene or per contig will vary by the length, and therefore must be normalized in order to be meaningful (such normalization is already expressed by the coverage). For example, if two bacterial species had equal abundance, but one has a genome 2x larger than the other, this will account for 2x the number of reads, even if the coverage is the same.
+
+![raw_vs_normalized_metagenome_counts_v1.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/raw_vs_normalized_metagenome_counts_v1.png)
+
+This means longer genes, contigs, or chromosomes will have more counts, but also means that total counts to homologous operons between species will vary by both coverage and length. If the objective is to make a statement about the abundance of particular genes or pathways in the sample, the contig coverage could be simplistically applied to the operon. However, it may be better to quantify the actual expression (qPCR or metatranscriptomics) or protein activity instead.
 
 ![metagenome_gc_cov_vs_read_counts_v1.png](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/metagenome_gc_cov_vs_read_counts_v1.png)
 
@@ -135,6 +141,9 @@ This is the first attempt to convert the plotting into an interactive [ShinyApp]
 ![blobplot_screenshot_Emuelleri.png](https://github.com/wrf/lavaLampPlot/blob/master/Rshiny/blobplot_screenshot_Emuelleri.png)
 
 ## Usage considerations
+
+![wrfs_tips_on_env_dna_bioinfo_v2.svg](https://github.com/wrf/lavaLampPlot/blob/master/sample_data/wrfs_tips_on_env_dna_bioinfo_v2.svg)
+
 #### Choosing k-mer length
 Due to the connection between kmer length and coverage, there is necessarily a balance between longer kmers, which will resolve the y-axis better, and higher coverage, which will resolve the x-axis better. Kmers between 31 and 41 tend to perform fairly well. Because the Trinity steps cannot use a kmer larger than 32, setting the kmer to 31 is advisable (odd numbers are preferable to prevent double counting from palindromic sequences).
 
