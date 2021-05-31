@@ -227,7 +227,7 @@ def main(argv, wayout):
 		argv.append("-h")
 
 	parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
-	parser.add_argument('input_file', help="jellyfish dump of fasta format kmers")
+	parser.add_argument('-i', '--input_file', help="jellyfish dump of fasta format kmers", required=True)
 	parser.add_argument('-a', '--above', type=int, metavar='N', default=1, help="retrieve kmers with a count greater than N [1]")
 	parser.add_argument('-b', '--below', type=int, metavar='N', default=10000, help="retrieve kmers with a count less than N [10000]")
 	parser.add_argument('-s', '--strong', type=float, metavar='0.F', default=0.0, help="retrieve kmers with GC percent greater than N [0.0]")
