@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 '''
-sort_reads_from_bam.py v0.1 2018-05-14
+sort_reads_from_bam.py v0.1 2021-05-31
 
     can take stdin for BAM files, and allow reads as .gz:
 samtools view hits.bam | sort_reads_from_bam.py -i - -c bacterial_contigs -1 reads1.fq.gz -2 reads2.fq.gz
@@ -40,13 +40,13 @@ def get_contig_list(contigfile, delimiter):
 	'''parse file of contig names and return a dictionary where keys are contig IDs and values are True'''
 	if not os.path.isfile(contigfile):
 		if contigfile=="*": # if star is given, then make dict of * only
-			print >> sys.stderr, "# Searching reads that did not align", time.asctime()
+			sys.stderr.write( "# Searching reads that did not align\n" )
 			contigdict = {"*":True}
 		else:
-			print >> sys.stderr, "# Searching reads mapped to {}".format(contigfile), time.asctime()
+			sys.stderr.write( "# Searching reads mapped to {}\n".format(contigfile) )
 			contigdict = {contigfile:True}
 		return contigdict
-	print >> sys.stderr, "# Reading contigs file {}".format(contigfile), time.asctime()
+	sys.stderr.write( "# Reading contigs file {}  {}\n".format(contigfile, time.asctime() ) )
 	if delimiter and delimiter=="\\t": # in case the instructions are disregarded and "\t" is used
 		delimiter = "\t"
 	contigdict = {}
@@ -60,13 +60,13 @@ def get_contig_list(contigfile, delimiter):
 		contigdict[line] = True
 		if not example:
 			example = line
-			print >> sys.stderr, "Contigs from file parsed as: {}".format(example)
-	print >> sys.stderr, "# Found {} contigs".format(len(contigdict) ), time.asctime()
+			sys.stderr.write( "Contigs from file parsed as: {}\n".format(example) )
+	sys.stderr.write( "# Found {} contigs  {}\n".format(len(contigdict) , time.asctime() ) )
 	return contigdict
 
 def bam_to_read_counts(samfile, nodiscord, doexclude, keepsingle, contigs, bybase, verbose):
 	'''parse the SAM file, and count reads mapped to each contig as a dict, and if collecting reads, then also return a dict of read IDs to keep'''
-	print >> sys.stderr, "# Parsing SAM input", time.asctime()
+	sys.stderr.write( "# Parsing SAM input  {}\n".format( time.asctime() ) )
 	readcount = 0
 	keepcount = 0
 	readidstokeep = {}
@@ -78,7 +78,7 @@ def bam_to_read_counts(samfile, nodiscord, doexclude, keepsingle, contigs, bybas
 				if not readcount % 100000:
 					sys.stderr.write(".")
 				if not readcount % 1000000:
-					print >> sys.stderr, readcount, time.asctime()
+					sys.stderr.write( "{}   {}\n".format( readcount, time.asctime() ) )
 			# Read_12345	0	contig	86	254	100M	*	0	0	TTCTCATGG
 			lsplits = line.split("\t")
 			if not keepsingle and lsplits[6]=="*": # second read did not match
@@ -106,10 +106,10 @@ def bam_to_read_counts(samfile, nodiscord, doexclude, keepsingle, contigs, bybas
 						keepcount += 1
 						readidstokeep[lsplits[0]] = True
 	else:
-		print >> sys.stderr, readcount, time.asctime()
-	print >> sys.stderr, "# Finished parsing {} reads".format(readcount), time.asctime()
+		sys.stderr.write( "{}   {}\n".format( readcount, time.asctime() ) )
+	sys.stderr.write( "# Finished parsing {} reads  {}\n".format(readcount, time.asctime() ) )
 	if keepcount:
-		print >> sys.stderr, "Parsed {} reads to keep for {} IDs".format(keepcount, len(readidstokeep) ), time.asctime()
+		sys.stderr.write( "Parsed {} reads to keep for {} IDs\n".format(keepcount, len(readidstokeep) ) )
 	return readidstokeep, scaffoldCountsDict
 
 def get_read_pairs(reads1, reads2, kept1, kept2, readIDstoKeep, readformat, opentype, verbose):
@@ -123,13 +123,13 @@ def get_read_pairs(reads1, reads2, kept1, kept2, readIDstoKeep, readformat, open
 				if not readcounter % 100000:
 					sys.stderr.write(".")
 				if not readcounter % 1000000:
-					print >> sys.stderr, readcounter, time.asctime()
+					sys.stderr.write("{}   {}\n".format( readcounter, time.asctime() ) )
 			if readIDstoKeep.get(sr1.id, False) or readIDstoKeep.get(sr2.id, False):
 				writecounter += 1
 				o1.write(sr1.format(readformat))
 				o2.write(sr2.format(readformat))
-	print >> sys.stderr, "Parsed {} read pairs".format(readcounter), time.asctime()
-	print >> sys.stderr, "Kept {} ({:.2f}%) read pairs".format(writecounter, writecounter*100.0/readcounter), time.asctime()
+	sys.stderr.write( "Parsed {} read pairs  {}\n".format(readcounter, time.asctime() ) )
+	sys.stderr.write( "Kept {} ({:.2f}%) read pairs\n".format(writecounter, writecounter*100.0/readcounter) )
 	# no return
 
 def get_long_reads(longreads, keptreads, readIDstoKeep, readformat, opentype, verbose):
@@ -143,12 +143,12 @@ def get_long_reads(longreads, keptreads, readIDstoKeep, readformat, opentype, ve
 				if not readcounter % 10000:
 					sys.stderr.write(".")
 				if not readcounter % 100000:
-					print >> sys.stderr, readcounter, time.asctime()
+					sys.stderr.write("{}   {}\n".format( readcounter, time.asctime() ) )
 			if readIDstoKeep.get(sr.id, False):
 				writecounter += 1
 				o1.write(sr.format(readformat))
-	print >> sys.stderr, "Parsed {} reads".format(readcounter), time.asctime()
-	print >> sys.stderr, "Kept {} ({:.2f}%) reads".format(writecounter, writecounter*100.0/readcounter), time.asctime()
+	sys.stderr.write( "Parsed {} reads  {}\n".format(readcounter, time.asctime() ) )
+	sys.stderr.write( "Kept {} ({:.2f}%) reads\n".format(writecounter, writecounter*100.0/readcounter ) )
 	# no return
 
 def main(argv, wayout):
@@ -179,12 +179,12 @@ def main(argv, wayout):
 		f1base, f1ext = os.path.splitext(args.file1)
 		f2base, f2ext = os.path.splitext(args.file2)
 		if f1ext==".gz" and f2ext==".gz":
-			print >> sys.stderr, "# Parsing read pairs as {} gz".format(args.format), time.asctime()
+			sys.stderr.write( "# Parsing read pairs as {} gz\n".format(args.format, time.asctime() ) )
 			outfile1 = "{}.{}.gz".format(f1base, args.outname)
 			outfile2 = "{}.{}.gz".format(f2base, args.outname)
 			opentype = gzip.open
 		else:
-			print >> sys.stderr, "# Parsing read pairs as {}".format(args.format), time.asctime()
+			sys.stderr.write( "# Parsing read pairs as {}  {}\n".format(args.format, time.asctime() ) )
 			outfile1 = "{}.{}".format(args.file1, args.outname)
 			outfile2 = "{}.{}".format(args.file2, args.outname)
 			opentype = open
@@ -194,12 +194,12 @@ def main(argv, wayout):
 	if args.long:
 		lbase, lext = os.path.splitext(args.long)
 		if lext==".gz": # for anything like reads1.fastq.gz
-			print >> sys.stderr, "# Parsing {} as {} gz".format(args.long, args.format), time.asctime()
+			sys.stderr.write( "# Parsing {} as {} gz  {}\n".format(args.long, args.format, time.asctime() ) )
 			outfile1 = "{}.{}.gz".format(lbase, args.outname)
 			opentype = gzip.open
 		else:
 			opentype = open
-			print >> sys.stderr, "# Parsing {} as {}".format(args.long, args.format), time.asctime()
+			sys.stderr.write( "# Parsing {} as {}  {}\n".format(args.long, args.format, time.asctime() ) )
 			outfile1 = "{}.{}{}".format(lbase, args.outname, lext) # lext should include .
 		get_long_reads(args.long, outfile1, readIDstoKeep, args.format, opentype, args.verbose)
 
@@ -210,15 +210,15 @@ def main(argv, wayout):
 			if args.exclude: # should print scaffolds that do not match contigs
 				if not contigdict.get(k,True):
 					scafcountsum += v
-					print >> wayout, k,v
+					wayout.write( "{} {}\n".format(k,v) )
 			else:
 				if contigdict.get(k,False):
 					scafcountsum += v
-					print >> wayout, k,v
+					wayout.write( "{} {}\n".format(k,v) )
 		else: # if contigs are not preselected, then just output only contigs and counts found in the SAM
-			print >> wayout, k,v
+			wayout.write( "{} {}\n".format(k,v) )
 	if scafcountsum:
-		print >> sys.stderr, "Found {} total mapped reads".format(scafcountsum), time.asctime()
+		sys.stderr.write( "Found {} total mapped reads  {}\n".format(scafcountsum, time.asctime() ) )
 
 if __name__ == "__main__":
 	main(sys.argv[1:],sys.stdout)
