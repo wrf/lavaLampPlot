@@ -8,10 +8,10 @@ Eitel, M., Francis, W.R., Varoqueaux, F., Daraspe, J., Osigus, H-J., Krebs, S., 
 ### Contents: ###
 
 * [Dependencies](https://github.com/wrf/lavaLampPlot#dependencies)
-* [Operation](https://github.com/wrf/lavaLampPlot#operation)
-* [Blob plots](https://github.com/wrf/lavaLampPlot#making-a-blob-plot-of-contigs)
-* [Shiny app](https://github.com/wrf/lavaLampPlot#shinyapp-test)
-* [Usage tips](https://github.com/wrf/lavaLampPlot#usage-considerations)
+* [Operation](https://github.com/wrf/lavaLampPlot#operation) to make kmer or read-based lavalamp plots
+* [Blob plots](https://github.com/wrf/lavaLampPlot#making-a-blob-plot-of-contigs) for metagenomes
+* [Shiny app](https://github.com/wrf/lavaLampPlot#shinyapp-test) for interactive binning
+* [Usage tips](https://github.com/wrf/lavaLampPlot#usage-considerations) including suggestions on data display
 * [Troubleshooting](https://github.com/wrf/lavaLampPlot#troubleshooting)
 
 ## Overview
@@ -124,7 +124,7 @@ The above steps 8 and 9 can be applied to assembled contigs/scaffolds, however, 
 
     `~/samtools-1.8/samtools view twilhelma_2014_vs_scaffolds_v1.sorted.bam | ~/git/lavaLampPlot/sort_reads_from_bam.py -i - > twilhelma_2014_vs_scaffolds_v1.sorted.hits_from_bam.txt`
 
-3. Compile the coverage, length, and GC content using the `hits_to_coverage.py` script.
+3. Collect the coverage, length, and GC content using the `hits_to_coverage.py` script.
 
     `~/git/lavaLampPlot/hits_to_coverage.py -f twilhelma_scaffolds_v1.fasta -b twilhelma_2014_vs_scaffolds_v1.sorted.hits_from_bam.txt > twilhelma_2014_vs_scaffolds_v1.coverage.tab`
 
@@ -135,8 +135,18 @@ The above steps 8 and 9 can be applied to assembled contigs/scaffolds, however, 
 ### As a direct output of some assemblers
 Some assemblers report the contig coverage directly within the fasta header, such as [SPAdes](https://github.com/ablab/spades). Another [script](https://bitbucket.org/wrf/sequences/src/master/spadescontigstocovgc.py) can convert this directly into a compatible table.
 
+1. Run [spadescontigstocovgc.py](https://bitbucket.org/wrf/sequences/src/master/spadescontigstocovgc.py) directly on the assembly fasta file. This *should* work for assembly files from [SPAdes](https://github.com/ablab/spades), [platanus](http://platanus.bio.titech.ac.jp/), and [MEGAHIT](https://github.com/voutcn/megahit), possibly others.
+
+    `spadescontigstocovgc.py scaffolds.fasta > scaffolds.stats.tab`
+
+2. Generate the plot as above with the R script `contig_gc_coverage.R`:
+
+    `Rscript ~/git/lavaLampPlot/contig_gc_coverage.R scaffolds.stats.tab`
+
 ## ShinyApp test ##
 This is the first attempt to convert the plotting into an interactive [ShinyApp](https://shiny.rstudio.com/tutorial/), with 3 slide bars to control what scaffolds are shown. Here, using the example data from [Ephydatia muelleri](https://spaces.facsci.ualberta.ca/ephybase/), the pink spot on the left shows a low-coverage bacterial partial-chromosome. Mouse-clicks displays the stats for that scaffold, and others nearby, below the plot.
+
+The input file is declared in the first lines of the [app source](https://github.com/wrf/lavaLampPlot/blob/master/Rshiny/app.R). This should be changed to either the output of `hits_to_coverage.py` or `spadescontigstocovgc.py` to view the contigs interactively.
 
 ![blobplot_screenshot_Emuelleri.png](https://github.com/wrf/lavaLampPlot/blob/master/Rshiny/blobplot_screenshot_Emuelleri.png)
 
