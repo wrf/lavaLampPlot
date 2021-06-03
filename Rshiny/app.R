@@ -6,8 +6,12 @@ library(shiny)
 #coveragefile = "~/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib002_final_assembly.coverage_gc.tab"
 coveragefile = "~/project/climate_lake_metagenome/climate_lake1_scaffolds.stats.w_genus.tab"
 
-
 coveragedata = read.table(coveragefile, header=TRUE, sep='\t')
+# check if header is correct
+if (colnames(coveragedata)[1]!="scaffold"){
+  print("ERROR: unrecognized header format in coverage stats file")
+  print("headings should be:   scaffold	number	length	coverage	GC	gaps")
+}
 contiglengths = coveragedata[["length"]]
 magnituderange = range( log10(contiglengths) )
 pchsize = log10(contiglengths) - magnituderange[1]
