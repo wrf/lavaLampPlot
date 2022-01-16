@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-'''hits_to_coverage.py  last modified 2019-03-11
+'''hits_to_coverage.py  last modified 2022-01-15
 
     combine number of reads mapped to each contig with
     length and GC content, to make a tabular output as:
@@ -32,7 +32,7 @@ def main(argv, wayout):
 	args = parser.parse_args(argv)
 
 	hitdict = {}
-	print >> sys.stderr, "# Reading counts from {}".format(args.hits_from_bam)
+	print("# Reading counts from {}".format(args.hits_from_bam), file=sys.stderr)
 	for line in open(args.hits_from_bam,'r'):
 		seqid, hits = line.strip().split(' ')
 		hitdict[seqid] = int(hits)
@@ -40,8 +40,8 @@ def main(argv, wayout):
 	seqcounter = 0
 	keptcounter = 0
 	baseremoval = 0
-	print >> sys.stderr, "# Reading contigs from {}".format(args.fasta)
-	print >> sys.stdout, "scaffold\tnumber\tlength\tcoverage\tGC\tgaps"
+	print( "# Reading contigs from {}".format(args.fasta), file=sys.stderr)
+	sys.stdout.write( "scaffold\tnumber\tlength\tcoverage\tGC\tgaps\n" )
 	for seqrec in SeqIO.parse(args.fasta,"fasta"):
 		seqcounter += 1
 		seqlength = len(seqrec.seq)
@@ -49,14 +49,14 @@ def main(argv, wayout):
 		gc = (seqrec.seq.count("G")+seqrec.seq.count("C")) * 100.0 / ( len(seqrec.seq) - gaps )
 		coverage = int(args.read_length * hitdict.get(seqrec.id,0) / seqlength)
 		if coverage <= args.above or coverage > args.below or gc < args.strong or gc > args.weak:
-			print >> sys.stderr, "# IGNORING {}: len={} GC={:.2f} COVERAGE={:.2f}".format( seqrec.id, seqlength, gc, coverage )
+			print( "# IGNORING {}: len={} GC={:.2f} COVERAGE={:.2f}".format( seqrec.id, seqlength, gc, coverage ), file=sys.stderr)
 			baseremoval += seqlength
 			continue
 		keptcounter += 1
-		print >> sys.stdout, "{}\t{}\t{}\t{}\t{}\t{}".format( seqrec.id, seqcounter, seqlength, coverage, gc, gaps )
-	print >> sys.stderr, "# Counted {} sequences, kept {}".format( seqcounter, keptcounter )
+		sys.stdout.write( "{}\t{}\t{}\t{}\t{}\t{}\n".format( seqrec.id, seqcounter, seqlength, coverage, gc, gaps ) )
+	print( "# Counted {} sequences, kept {}".format( seqcounter, keptcounter ), file=sys.stderr)
 	if baseremoval:
-		print >> sys.stderr, "# Removed {} sequences, totaling {} bases".format( seqcounter-keptcounter, baseremoval )
+		print( "# Removed {} sequences, totaling {} bases".format( seqcounter-keptcounter, baseremoval ), file=sys.stderr)
 
 if __name__ == "__main__":
 	main(sys.argv[1:],sys.stdout)
