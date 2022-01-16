@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 '''
-sort_reads_from_bam.py v0.1 2021-05-31
+sort_reads_from_bam.py v0.2 2022-01-15
 
     can take stdin for BAM files, and allow reads as .gz:
 samtools view hits.bam | sort_reads_from_bam.py -i - -c bacterial_contigs -1 reads1.fq.gz -2 reads2.fq.gz
@@ -33,7 +33,6 @@ import argparse
 import time
 import gzip
 from collections import defaultdict
-from itertools import izip
 from Bio import SeqIO
 
 def get_contig_list(contigfile, delimiter):
@@ -117,7 +116,7 @@ def get_read_pairs(reads1, reads2, kept1, kept2, readIDstoKeep, readformat, open
 	readcounter = 0
 	writecounter = 0
 	with opentype(reads1,'r') as f1, opentype(reads2,'r') as f2, opentype(kept1,'w') as o1, opentype(kept2,'w') as o2:
-		for sr1,sr2 in izip(SeqIO.parse(f1, readformat), SeqIO.parse(f2, readformat) ):
+		for sr1,sr2 in zip(SeqIO.parse(f1, readformat), SeqIO.parse(f2, readformat) ):
 			readcounter += 1
 			if verbose:
 				if not readcounter % 100000:
