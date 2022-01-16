@@ -1,4 +1,4 @@
-# contig gc coverage  last modified 2020-06-03
+# contig gc coverage  last modified 2022-01-16
 # output should be tab-delimited as as:
 # contigname  contignumber  length  coverage  GC  gaps
 # this is the output from hits_to_coverage.py and spadescontigstocovgc.py
@@ -15,6 +15,10 @@ print(paste0("Reading ",inputfile,", writing to ",outputfile))
 print("expecting input as:  contigname  contignumber  length  coverage  GC  gaps")
 
 coveragedata = read.table(inputfile, header=TRUE, sep='\t')
+# reverse row order, since it usually expects biggest contigs first
+# this ends up with largest contigs plotted last, meaning top layer
+coveragedata = coveragedata[rev(1:nrow(coveragedata)),]
+# does not work for app, as table is displayed in reverse order
 
 names = coveragedata[,1]
 
