@@ -1,12 +1,13 @@
 # make interactive plot of contigs in genomes or metagenomes
-# last modified 2020-12-31
+# last modified 2022-01-16
 
 library(shiny)
 
-#coveragefile = "~/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib002_final_assembly.coverage_gc.tab"
-coveragefile = "~/project/climate_lake_metagenome/climate_lake1_scaffolds.stats.w_genus.tab"
+coveragefile = "~/project/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib001_final_assembly.coverage_gc.tab"
 
 coveragedata = read.table(coveragefile, header=TRUE, sep='\t')
+#coveragedata = coveragedata[rev(1:nrow(coveragedata)),]
+
 # check if header is correct
 if (colnames(coveragedata)[1]!="scaffold"){
   print("ERROR: unrecognized header format in coverage stats file")
@@ -96,10 +97,12 @@ server <- function(input, output) {
 
     datarange = input$length[1] <= log10(contiglengths) & log10(contiglengths) <= input$length[2]
     par(mar=c(4.5,4.5,3,1))
-    plot(coveragedata[["coverage"]][datarange], coveragedata[["GC"]][datarange], type='p', 
+    # reverse row order, since it usually expects biggest contigs first
+    # this ends up with largest contigs plotted last, meaning top layer
+    plot( rev(coveragedata[["coverage"]][datarange]), rev(coveragedata[["GC"]][datarange]), type='p', 
          xlim=coverage_range, ylim=input$gc, log=axis_mode,
          xlab="Mean coverage of mapped reads", ylab="GC%", 
-         pch=16, frame.plot=FALSE, col=pointcolor[datarange], cex.axis=1.5, cex=pchsize[datarange], main="", cex.lab=1.4)
+         pch=16, frame.plot=FALSE, col=rev(pointcolor[datarange]), cex.axis=1.5, cex=rev(pchsize[datarange]), main="", cex.lab=1.4)
     # display overview stats on top left of graph
     all_contig_total = sum(coveragedata[["length"]])
     text(min(input$cov), max(input$gc), paste(dim(coveragedata)[1], "contigs", round(all_contig_total/1000000,digits=1),"Mb total"), pos=4, cex=1.2)
@@ -134,10 +137,10 @@ server <- function(input, output) {
       pdf_title = paste0(input$cov[1],"-",input$cov[2],"cov_", input$gc[1], "-",input$gc[2], "gc", ".pdf")
       pdf(file, width=7, height=6, title=pdf_title)
       par(mar=c(4.5,4.5,3,1))
-      plot(coveragedata[["coverage"]][datarange], coveragedata[["GC"]][datarange], type='p', 
+      plot( rev(coveragedata[["coverage"]][datarange]), rev(coveragedata[["GC"]][datarange]), type='p', 
            xlim=coverage_range, ylim=input$gc, log=axis_mode,
            xlab="Mean coverage of mapped reads", ylab="GC%", 
-           pch=16, frame.plot=FALSE, col=pointcolor[datarange], cex.axis=1.5, cex=pchsize[datarange], main="", cex.lab=1.4)
+           pch=16, frame.plot=FALSE, col=rev(pointcolor[datarange]), cex.axis=1.5, cex=rev(pchsize[datarange]), main="", cex.lab=1.4)
       dev.off()
       }
     )
