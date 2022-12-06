@@ -1,6 +1,7 @@
 # make interactive plot of contigs in genomes or metagenomes
-# last modified 2022-03-28
+# last modified 2022-12-06
 # v1.2 switch to ggplot and dplyr
+# v1.3 add option to highlight contigs with orange diamonds
 
 library(shiny)
 library(ggplot2)
@@ -8,7 +9,7 @@ library(dplyr)
 
 #coveragefile = "~/project/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib001_final_assembly.coverage_gc.tab"
 #coveragefile = "~/project/climate_lake_metagenome/climate_lake1_scaffolds.stats.w_genus.tab"
-coveragefile = "~/project/genomes/sycon_ciliatum_PORI/sycon_w_370_600_and_600_700_hisat2.gc_coverage.tab"
+coveragefile = "~/git/genome-reannotations/jbrowse-tracks/sycon/sycon_w_370_600_and_600_700_hisat2.gc_coverage.tab"
 
 coveragedata = read.table(coveragefile, header=TRUE, sep='\t')
 #coveragedata = coveragedata[rev(1:nrow(coveragedata)),]
@@ -67,6 +68,8 @@ ui <- fluidPage(
                   value = c(3,8),
                   step = 0.1
       ),
+      textInput("userContig", label = "Highlight contigs/scaffolds by name from table, separated by ,", 
+                value = ""),
       radioButtons("cov_mode", h4("Coverage axis mode"),
                    choices = c("Linear", "Logarithmic"),
                    selected = "Linear"
@@ -113,6 +116,8 @@ server <- function(input, output) {
                 )  %>%
       arrange(length) # put biggest points last, so they appear on top
     
+    uf = filter(coveragedata, scaffold %in% as.list(scan(text=trimws( input$userContig ), what='', sep=',') ) )
+    
     all_contig_total = sum(coveragedata[["length"]])
     sub_table = brushedPoints(coveragedata, input$plot_brush, xvar = "coverage", yvar = "GC")
     sub_size_total = sum(sub_table[["length"]])
@@ -124,7 +129,8 @@ server <- function(input, output) {
             axis.title=element_text(size=18),
             plot.title = element_text(size=20) ) +
       scale_y_continuous(limits=input$gc) +
-      scale_x_continuous(limits=c( ifelse(input$cov_mode=="Linear",input$cov[1],1), input$cov[2]),
+      scale_x_continuous(expand = expansion(mult = c(0.005, 0.03) ),
+                         limits=c( ifelse(input$cov_mode=="Linear",input$cov[1],1), input$cov[2]),
                          trans = ifelse(input$cov_mode=="Linear","identity","log10") ) +
       scale_colour_identity() +
       #scale_colour_stepsn(colours = point_palette, breaks = c(0, 100000, 1000000) ) +
@@ -135,10 +141,13 @@ server <- function(input, output) {
       annotate(geom="text", x=max(input$cov), y=min(input$gc), size=5, hjust=1,
                label=paste(dim(sub_table)[1], "contigs", round(sub_size_total/1000000,digits=1),"Mb selected") ) +
       annotate(geom="text", x=max(input$cov), y=max(input$gc), size=5, hjust=1,
-               label=paste("Showing contigs from", round(10^input$length[1]), "bp to", round(10^input$length[2]), "bp") )
+               label=paste("Showing", nrow(fd), "contigs from", round(10^input$length[1]), "bp to", round(10^input$length[2]), "bp") )
     # add optional highlighting points
     if (TRUE){
-    gg = gg + geom_point( data=sub_table, col="#000000" )
+      # draw black points for all bounded box contigs
+      gg = gg + geom_point( data=sub_table, col="#000000" ) 
+      # show user picked scaffold, if any
+      gg = gg + geom_point( data = uf, aes(x=coverage, y=GC), color ="#f8520a", size=7, stroke=3, shape=5, alpha=0.8)
     }
     
     gg
