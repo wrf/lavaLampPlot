@@ -181,7 +181,9 @@ server <- function(input, output) {
   })
   
   output$printpdf <- downloadHandler(
-    filename = function() {"plot.pdf"},
+    filename = function() { paste( "cov", paste(input$cov[1],input$cov[2],sep="_"),
+                                   "gc", paste(input$gc[1],input$gc[2],sep="_"), 
+                                   "plot.pdf", sep="_") },
     content = function(filename){
       gg_covplot = make_covplot()
       ggsave(filename, gg_covplot, device="pdf", width=8, height=6)
