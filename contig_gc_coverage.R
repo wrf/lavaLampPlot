@@ -1,4 +1,6 @@
-# contig gc coverage  last modified 2022-01-16
+# contig gc coverage
+# last modified 2022-12-13
+
 # output should be tab-delimited as as:
 # contigname  contignumber  length  coverage  GC  gaps
 # this is the output from hits_to_coverage.py and spadescontigstocovgc.py
@@ -7,7 +9,7 @@ args = commandArgs(trailingOnly=TRUE)
 
 inputfile = args[1]
 #inputfile = "~/genomes/ephydatia_muelleri/ASM_HIC_394/Emuelleri_lib001_final_assembly.coverage_gc.tab"
-outputfile = gsub("([\\w/]+)\\....$","\\1.pdf",inputfile,perl=TRUE)
+outputfile = gsub("([\\w/]+)\\....$","\\1.pdf",gsub(".gz","",inputfile),perl=TRUE)
 
 if (inputfile==outputfile) { stop("cannot parse input file to generate output file name, add a unique 3-letter suffix") }
 
@@ -78,8 +80,14 @@ gcspan = gcmax - gcmin
 # generate figure
 pdf(file=outputfile, width=8, height=7)
 par(mar=c(4.5,4.5,3,1))
-plot(coveragedata[["coverage"]], coveragedata[["GC"]], type='p', xlim=c(0,covmax), ylim=c(gcmin,gcmax), xlab="Mean coverage of mapped reads", ylab="GC%", pch=16, frame.plot=FALSE, col=pointcolor, cex.axis=1.5, cex=pchsize, main=inputfile, cex.lab=1.4)
-legend(covmax,gcmax, legend=legendlabels, pch=16, col=c("#39bc6799","#386edc99","#d51ea499"), pt.cex=legendpch, cex=1.1, title="Contig size (bp)", xjust=1)
+plot(coveragedata[["coverage"]], coveragedata[["GC"]], type='p', 
+     xlim=c(0,covmax), ylim=c(gcmin,gcmax), frame.plot=FALSE, 
+     xlab="Mean coverage of mapped reads", ylab="GC%", main=inputfile,
+     pch=16, col=pointcolor, cex=pchsize, 
+     cex.axis=1.5, cex.lab=1.4 )
+legend(covmax,gcmax, legend=legendlabels, pch=16, pt.cex=legendpch,
+       col=c("#39bc6799","#386edc99","#d51ea499"), cex=1.1, 
+       title="Contig size (bp)", xjust=1)
 text(covmax, gcmin + 0.05*gcspan, paste(round(totalsize/1000000,digits=1),"Mb"), cex=1.2, pos=2)
 text(covmax, gcmin, paste(length(names),"total contigs"), cex=1.2, pos=2)
 dev.off()
