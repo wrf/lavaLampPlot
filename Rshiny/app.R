@@ -108,8 +108,8 @@ server <- function(input, output) {
     # setting the variables here makes the values objective between datasets
     # allowing for comparison
     fd = mutate(coveragedata, #[rev(1:nrow(coveragedata)),],
-                lencolor = point_palette[round(log10(coveragedata$length)*10)],
-                lensize = log(coveragedata$length, base=8)
+                lencolor = point_palette[round(log10(coveragedata[["length"]])*10)],
+                lensize = log(coveragedata[["length"]], base=8)
                 ) %>%
       filter( log10(length) >= input$length[1] &
               log10(length) <= input$length[2]
@@ -137,9 +137,9 @@ server <- function(input, output) {
       labs(x="Coverage", y="GC%", title=paste("Using", basename(coveragefile) ) ) +
       geom_point( size=fd$lensize ) +
       annotate(geom="text", x=min(input$cov), y=max(input$gc), size=5, hjust=0,
-               label=paste(dim(coveragedata)[1], "contigs", round(all_contig_total/1000000,digits=1),"Mb total") ) + 
+               label=paste(nrow(coveragedata), "contigs", round(all_contig_total/1000000,digits=1),"Mb total") ) + 
       annotate(geom="text", x=max(input$cov), y=min(input$gc), size=5, hjust=1,
-               label=paste(dim(sub_table)[1], "contigs", round(sub_size_total/1000000,digits=1),"Mb selected") ) +
+               label=paste(nrow(sub_table), "contigs", round(sub_size_total/1000000,digits=1),"Mb selected") ) +
       annotate(geom="text", x=max(input$cov), y=max(input$gc), size=5, hjust=1,
                label=paste("Showing", nrow(fd), "contigs from", round(10^input$length[1]), "bp to", round(10^input$length[2]), "bp") )
     # add optional highlighting points

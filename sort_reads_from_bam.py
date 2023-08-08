@@ -165,7 +165,7 @@ def main(argv, wayout):
 	parser.add_argument('-n','--no-discordant', action="store_true", help="only count aligned pairs, ignoring singletons and discordant alignments")
 	parser.add_argument('-b','--bases', action="store_true", help="count coverage as bases mapped, instead of reads")
 	parser.add_argument('-e','--exclude', action="store_true", help="remove reads that match contigs, rather than keep them")
-	parser.add_argument('-s','--single', action="store_true", help="treat reads as separate, allowing for single reads to match")
+	parser.add_argument('-s','--single', action="store_true", help="treat reads as separate, allowing for single reads to match, or if reads were not paired end")
 	parser.add_argument('-v','--verbose', action="store_true", help="verbose output")
 	args = parser.parse_args(argv)
 
