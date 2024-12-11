@@ -1,15 +1,22 @@
 #!/usr/bin/env python
 # merge_uc_clusters.py created 2022-12-07
 # allow gzip 2023-04-11
+# check for write formats from R that cause problems 2024-12-11
 
-"""merge_uc_clusters.py  last modified 2023-04-11
+"""merge_uc_clusters.py  last modified 2024-12-11
     combine values of OTU counts based on cluster output from vsearch
 
 ./merge_uc_clusters.py cluster.uc otu_table.tab > merged_table.tab
 
-    assumes clusters are in tab-delimited format, as:
+    assumes OTU table is in tab-delimited format, as:
 seq_name    sample1    sample2    sample3
 seq1234     0          10         100
+seq5678     50         5          0
+
+    assumes tab-delimited cluster format from vsearch, as:
+S	0	503	*	*	*	*	*	ASV1210682	*
+S	1	503	*	*	*	*	*	ASV1218341	*
+S	2	503	*	*	*	*	*	ASV1221110	*
 
     after running vsearch:
 ~/vsearch-2.22.1-linux-x86_64-static/bin/vsearch --cluster_fast dna-sequences.fasta --id 0.97 --centroids centroids.fas --uc clusters.uc
@@ -44,11 +51,11 @@ else:
 		if line:
 			lsplits = line.split("\t")
 			record_type = lsplits[0]
-			if record_type == "S":
+			if record_type == "S": # centroid sequence
 				seqid_to_centroid[ lsplits[8] ] = lsplits[8]
-			elif record_type == "H":
+			elif record_type == "H": # hit to a cluster
 				seqid_to_centroid[ lsplits[8] ] = lsplits[9]
-			else: # implicitly "C"
+			else: # implicitly "C" meaning cluster record
 				pass
 	sys.stderr.write("# Counted {} seqs from cluster data\n".format( len(seqid_to_centroid) ) )
 
@@ -59,19 +66,21 @@ else:
 	if counts_table_file.rsplit('.',1)[-1]=="gz": # autodetect gzip format
 		_opentype = gzip.open
 		sys.stderr.write("# Reading counts table from {} as gzipped\n".format(counts_table_file) )
-	else: # otherwise assume normal open for fasta format
+	else: # otherwise assume normal open
 		_opentype = open
 		sys.stderr.write("# Reading counts table from {}\n".format(counts_table_file) )
 
 	for line in _opentype(counts_table_file,'rt'):
-		line = line.strip()
+		line = line.rstrip() # use rstrip() in case of initial empty tab from R
 		if line:
 			line_counter += 1
 			lsplits = line.split("\t")
 			if line_counter==1: # first line
 				n_samples = len(lsplits[1:])
+				if lsplits[0]=="": # first column is empty, give name
+				    line = "sampleID" + line
 				sys.stderr.write("# Detected {} samples\n".format(n_samples) )
-				print(line, file=sys.stdout)
+				print(line, file=sys.stdout) # use print to add back rstripped return
 				continue
 			seqid = lsplits[0] # seq name should always be first column
 			cluster_target = seqid_to_centroid.get(seqid, None)
